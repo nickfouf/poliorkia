@@ -8,7 +8,7 @@ import { GameWrapper } from "./gamewrapper";
 import { Game, GameClass } from "../game";
 import { RollbackNetcode } from "../netcode/rollback";
 import { assert } from "chai";
-import { PeerConnection } from "../matchmaking/peerconnection";
+import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 
 import * as lit from "lit-html";
 
@@ -31,13 +31,13 @@ export class RollbackWrapper extends GameWrapper {
     return initialInputs;
   }
 
-  startHost(players: Array<NetplayPlayer>, conn: PeerConnection) {
+  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
     assert(
       conn.dataChannel?.readyState === "open",
       "DataChannel must be open."
     );
 
-    log.info("Starting a lcokstep host.");
+    log.info("Starting a rollback host.");
 
     this.game = new this.gameClass(this.canvas, players);
 
@@ -70,13 +70,13 @@ export class RollbackWrapper extends GameWrapper {
     this.startGameLoop();
   }
 
-  startClient(players: Array<NetplayPlayer>, conn: PeerConnection) {
+  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
     assert(
       conn.dataChannel?.readyState === "open",
       "DataChannel must be open."
     );
 
-    log.info("Starting a lockstep client.");
+    log.info("Starting a rollback client.");
 
     this.game = new this.gameClass(this.canvas, players);
     this.rollbackNetcode = new RollbackNetcode(
@@ -139,5 +139,4 @@ export class RollbackWrapper extends GameWrapper {
     requestAnimationFrame(animate);
   }
 }
-
 
