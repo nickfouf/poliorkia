@@ -41,36 +41,53 @@ export class PasseTrappeGame extends Game {
       this.heldOffsets[player.getID()] = null;
     }
 
-    const xPositions = [-3.4, -1.7, 1.7, 3.4];
-    const zStart = 4.8;
-    const zSpacing = 1.6;
+    // Configuration for 6 pucks per side
+    // Arranged in two columns (left and right) of 3 pucks each
+    const xSide = 3.4;
+    const zPositions = [6.0, 4.5, 3.0]; // Spaced 1.5 units apart
 
     // Player 0 (Negative Z side)
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 4; col++) {
-        this.pulis.push({
-          id: idCounter++,
-          owner: 0,
-          x: xPositions[col],
-          y: -(zStart - row * zSpacing),
-          vx: 0,
-          vy: 0
-        });
-      }
+    for (const z of zPositions) {
+      // Left Column
+      this.pulis.push({
+        id: idCounter++,
+        owner: 0,
+        x: -xSide,
+        y: -z,
+        vx: 0,
+        vy: 0
+      });
+      // Right Column
+      this.pulis.push({
+        id: idCounter++,
+        owner: 0,
+        x: xSide,
+        y: -z,
+        vx: 0,
+        vy: 0
+      });
     }
 
     // Player 1 (Positive Z side)
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 4; col++) {
-        this.pulis.push({
-          id: idCounter++,
-          owner: 1,
-          x: xPositions[col],
-          y: (zStart - row * zSpacing),
-          vx: 0,
-          vy: 0
-        });
-      }
+    for (const z of zPositions) {
+      // Left Column (Negative X)
+      this.pulis.push({
+        id: idCounter++,
+        owner: 1,
+        x: -xSide,
+        y: z,
+        vx: 0,
+        vy: 0
+      });
+      // Right Column (Positive X)
+      this.pulis.push({
+        id: idCounter++,
+        owner: 1,
+        x: xSide,
+        y: z,
+        vx: 0,
+        vy: 0
+      });
     }
   }
 
@@ -183,6 +200,3 @@ export class PasseTrappeGame extends Game {
     this.scene.draw(this.pulis);
   }
 }
-
-
-

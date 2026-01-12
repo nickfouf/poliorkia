@@ -61,14 +61,24 @@ export class GameMenu {
     }
   }
 
-  async joinPrivate(id: string) {
-    if (id.length !== 6) return;
+  async joinPrivate(idInput: string) {
+    // Trim whitespace to prevent "213090 " failing the length check
+    const id = idInput.trim();
+    if (id.length !== 6) {
+      this.state = { view: "error", errorMsg: "Code must be exactly 6 digits." };
+      this.render();
+      return;
+    }
+
     this.state = { view: "joining" };
     this.render();
+    
     try {
       await this.matchmaker.joinPrivateRoom(id);
-    } catch (e) {
-      this.state = { view: "error", errorMsg: "Room not found or full." };
+    } catch (e: any) {
+      // Show the actual error message from the matchmaker (e.g. "Room not found")
+      console.error(e);
+      this.state = { view: "error", errorMsg: e.message || "Connection failed." };
       this.render();
     }
   }

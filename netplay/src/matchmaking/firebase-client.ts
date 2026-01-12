@@ -37,7 +37,7 @@ export class FirebasePeerConnection extends EventEmitter {
         iceServers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }]
     ) {
         super();
-        
+
         this.peerConnection = new RTCPeerConnection({ iceServers });
 
         // 1. Handle ICE Candidates
@@ -204,20 +204,35 @@ export class FirebaseMatchmaker {
      */
     async joinPrivateRoom(roomId: string) {
         const roomRef = ref(db, `rooms/${roomId}`);
-        
+
+        // 1. Pre-fetch check: Ensures the room exists and warms the local cache
+        // to prevent the transaction from seeing 'null' and aborting.
+        const snapshot = await get(roomRef);
+        if (!snapshot.exists()) {
+            throw new Error("Room does not exist.");
+        }
+
+        // 2. Transactionally claim the client slot
         const result = await runTransaction(roomRef, (room) => {
-            if (room && room.host && !room.client) {
+            if (room === null) return null; // Ignore cold cache, retry
+
+            if (room.host && !room.client) {
                 room.client = this.myId;
                 return room;
             }
-            return; // Abort if room doesn't exist or full
+            return; // Abort if room is full or invalid
         });
 
         if (result.committed) {
             const val = result.snapshot.val();
-            this.connect(roomId, val.host, false);
+            // Double check we are the ones recorded as client
+            if (val && val.client === this.myId) {
+                this.connect(roomId, val.host, false);
+            } else {
+                throw new Error("Room is full.");
+            }
         } else {
-            throw new Error("Room not found or full");
+            throw new Error("Room not found or full.");
         }
     }
 
