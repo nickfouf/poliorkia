@@ -1,18 +1,18 @@
-import { DefaultInput, DefaultInputReader } from "../defaultinput";
-import { NetplayPlayer, NetplayState } from "../netcode/types";
+import { DefaultInputReader } from "../defaultinput";
+import { NetplayPlayer } from "../netcode/types";
 
 import * as log from "loglevel";
 import { GameClass } from "../game";
 
 import { assert } from "chai";
 
-import { DEFAULT_SERVER_URL, MatchmakingClient } from "../matchmaking/client";
-import { PeerConnection } from "../matchmaking/peerconnection";
-
 import * as utils from "../utils";
 import * as lit from "lit-html";
 import { GameMenu } from "../ui/gamemenu";
 import EWMASD from "../ewmasd";
+
+// Use Firebase Client instead of old WebSocket client
+import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 
 const PING_INTERVAL = 100;
 
@@ -204,7 +204,7 @@ export abstract class GameWrapper {
     });
   }
 
-  startVisibilityWatcher(conn: PeerConnection) {
+  startVisibilityWatcher(conn: FirebasePeerConnection) {
     // Send the current tab visibility to the other player.
     conn.send({ type: "visibility-state", value: document.visibilityState });
 
@@ -227,7 +227,7 @@ export abstract class GameWrapper {
   }
 
   pingMeasure: EWMASD = new EWMASD(0.2);
-  startPing(conn: PeerConnection) {
+  startPing(conn: FirebasePeerConnection) {
     setInterval(() => {
       conn.send({ type: "ping-req", sent_time: performance.now() });
     }, PING_INTERVAL);
@@ -272,8 +272,7 @@ export abstract class GameWrapper {
     }, 1000);
   }
 
-  abstract startHost(players: Array<NetplayPlayer>, conn: PeerConnection);
-  abstract startClient(players: Array<NetplayPlayer>, conn: PeerConnection);
+  abstract startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection);
+  abstract startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection);
 }
-
 

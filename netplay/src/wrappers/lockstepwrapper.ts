@@ -6,8 +6,8 @@ import { NetplayPlayer, NetplayState } from "../netcode/types";
 import * as log from "loglevel";
 import { GameWrapper } from "./gamewrapper";
 import { Game, GameClass } from "../game";
-import { PeerConnection } from "../matchmaking/peerconnection";
 import { assert } from "chai";
+import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 
 export class LockstepWrapper extends GameWrapper {
   game?: Game;
@@ -22,7 +22,7 @@ export class LockstepWrapper extends GameWrapper {
     else return 1;
   }
 
-  startHost(players: Array<NetplayPlayer>, conn: PeerConnection) {
+  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
     assert(
       conn.dataChannel?.readyState === "open",
       "DataChannel must be open."
@@ -61,7 +61,7 @@ export class LockstepWrapper extends GameWrapper {
     this.startGameLoop();
   }
 
-  startClient(players: Array<NetplayPlayer>, conn: PeerConnection) {
+  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
     assert(
       conn.dataChannel?.readyState === "open",
       "DataChannel must be open."
@@ -119,6 +119,10 @@ export class LockstepWrapper extends GameWrapper {
       <div>State Syncs: ${this.lockstepNetcode!.stateSyncsSent} sent, ${
         this.lockstepNetcode!.stateSyncsReceived
       } received</div>
+      <div>
+        BW: ${this.lockstepNetcode!.isHost ? "Sent" : "Recv"} 
+        ${this.lockstepNetcode!.isHost ? conn.sendStats.formatStats() : conn.receiveStats.formatStats()}
+      </div>
       `;
 
       // Request another frame.
@@ -127,5 +131,4 @@ export class LockstepWrapper extends GameWrapper {
     requestAnimationFrame(animate);
   }
 }
-
 

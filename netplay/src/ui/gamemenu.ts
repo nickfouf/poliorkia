@@ -1,294 +1,148 @@
 import { html, render } from "lit-html";
-import { DEFAULT_SERVER_URL, MatchmakingClient } from "../matchmaking/client";
-import * as query from "query-string";
-import * as QRCode from "qrcode";
-import EventEmitter from "eventemitter3";
-import { Disposable, TypedEvent } from "@vramesh/netplayjs-common/typedevent";
-import { PeerConnection } from "../matchmaking/peerconnection";
-import pkg from "../../package.json"
-
-type GameMenuState =
-  | {
-      kind: "connecting-to-server";
-    }
-  | {
-      kind: "registered";
-      clientID: string;
-      joinURL: string;
-      qrCanvas: HTMLCanvasElement;
-    }
-  | {
-      kind: "connecting-to-host";
-    }
-  | {
-      kind: "searching-for-matches";
-    }
-  | {
-      kind: "hosting-public-match";
-    }
-  | {
-      kind: "game-in-progress";
-    }
-  | {
-      kind: "connection-closed";
-    };
+import { FirebaseMatchmaker, FirebasePeerConnection } from "../matchmaking/firebase-client";
+import { TypedEvent } from "@vramesh/netplayjs-common/typedevent";
 
 export class GameMenu {
   root: HTMLDivElement;
+  matchmaker: FirebaseMatchmaker;
 
-  state: GameMenuState = { kind: "connecting-to-server" };
+  // Events for the GameWrapper to start the game
+  onClientStart: TypedEvent<FirebasePeerConnection> = new TypedEvent();
+  onHostStart: TypedEvent<FirebasePeerConnection> = new TypedEvent();
 
-  matchmaker: MatchmakingClient;
-
-  gameURL: string;
-
-  onClientStart: TypedEvent<PeerConnection> = new TypedEvent();
-  onHostStart: TypedEvent<PeerConnection> = new TypedEvent();
-
-  connectToHost(hostID: string) {
-    this.updateState({
-      kind: "connecting-to-host",
-    });
-
-    const conn = this.matchmaker.connectPeer(hostID);
-    conn.on("open", () => {
-      this.onClientStart.emit(conn);
-      this.updateState({
-        kind: "game-in-progress",
-      });
-      conn.onClose.on(() => {
-        this.updateState({
-          kind: "connection-closed",
-        });
-      });
-    });
-  }
+  state: {
+    view: "home" | "hosting" | "joining" | "matchmaking" | "error";
+    roomId?: string;
+    errorMsg?: string;
+  } = { view: "home" };
 
   constructor() {
-    // Set the root DIV element.
-    this.root = this.createRootElement();
+    this.root = document.createElement("div");
+    this.setupStyles();
+    document.body.appendChild(this.root);
 
-    // The URL of the game is everything before the hash.
-    this.gameURL = window.location.href.split("#")[0];
+    this.matchmaker = new FirebaseMatchmaker();
 
-    // Parse the window hash for params.
-    const parsedHash = query.parse(window.location.hash);
-
-    // Determine the server URL to connect to.
-    const serverURL: string =
-      (parsedHash.server as string) ||
-      this.getLocalStorageServerOverride() ||
-      DEFAULT_SERVER_URL;
-
-    // Create a matchmaking client and connect to the server.
-    this.matchmaker = new MatchmakingClient(serverURL);
-
-    // Wait for the client to be registered.
-    this.matchmaker.onRegistered.once(() => {
-      if (parsedHash.room) {
-        // If a hostID was provided in the URL hash,
-        // directly connect to that ID.
-        const hostID = parsedHash.room as string;
-        this.connectToHost(hostID);
+    // Listen globally for match success
+    this.matchmaker.onMatchFound.on((data) => {
+      this.root.style.display = "none"; // Hide menu
+      if (data.isHost) {
+        this.onHostStart.emit(data.connection);
       } else {
-        const room = this.matchmaker.clientID!;
-        const joinURL = this.getJoinURL(room);
-
-        const qrCanvas = document.createElement("canvas");
-        QRCode.toCanvas(qrCanvas, joinURL);
-
-        this.updateState({
-          kind: "registered",
-          clientID: room,
-          joinURL: joinURL,
-          qrCanvas,
-        });
-
-        this.startHostListening();
+        this.onClientStart.emit(data.connection);
       }
     });
 
     this.render();
   }
 
-  hostListeningHandle?: Disposable;
-  startHostListening() {
-    this.hostListeningHandle = this.matchmaker.onConnection.on((conn) => {
-      conn.on("open", () => {
-        this.onHostStart.emit(conn);
-        this.updateState({
-          kind: "game-in-progress",
-        });
-        conn.onClose.on(() => {
-          this.updateState({
-            kind: "connection-closed",
-          });
-        });
-      });
-    });
-  }
-  stopHostListening() {
-    this.hostListeningHandle!.dispose();
+  setupStyles() {
+    this.root.style.position = "absolute";
+    this.root.style.width = "100%";
+    this.root.style.height = "100%";
+    this.root.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
+    this.root.style.zIndex = "100";
+    this.root.style.display = "flex";
+    this.root.style.justifyContent = "center";
+    this.root.style.alignItems = "center";
+    this.root.style.fontFamily = "sans-serif";
   }
 
-  startMatchmaking() {
-    // Stop listening for connections.
-    this.stopHostListening();
-
-    // Send the match request and update UI to put
-    // as in the matchmaking state.
-    this.matchmaker.sendMatchRequest(this.gameURL, 2, 2);
-    this.updateState({
-      kind: "searching-for-matches",
-    });
-
-    this.matchmaker.onHostMatch.once((e) => {
-      this.updateState({
-        kind: "hosting-public-match",
-      });
-      this.startHostListening();
-    });
-
-    this.matchmaker.onJoinMatch.once((e) => {
-      this.connectToHost(e.hostID);
-    });
-  }
-
-  updateState(newState: GameMenuState) {
-    this.state = newState;
+  async createPrivate() {
+    this.state = { view: "hosting" };
     this.render();
-  }
-
-  /**
-   * Try to get a server override from local storage.
-   * Return NULL if we error (for example in incognito mode).
-   */
-  getLocalStorageServerOverride(): string | null {
     try {
-      return window.localStorage.getItem("NETPLAYJS_SERVER_OVERRIDE");
+      const id = await this.matchmaker.createPrivateRoom();
+      this.state.roomId = id;
+      this.render();
     } catch (e) {
-      return null;
+      this.state = { view: "error", errorMsg: "Could not create room." };
+      this.render();
     }
   }
 
-  getJoinURL(room: string): string {
-    let hashParams: any = { room: room };
-    if (this.matchmaker.serverURL !== DEFAULT_SERVER_URL) {
-      hashParams.server = this.matchmaker.serverURL;
+  async joinPrivate(id: string) {
+    if (id.length !== 6) return;
+    this.state = { view: "joining" };
+    this.render();
+    try {
+      await this.matchmaker.joinPrivateRoom(id);
+    } catch (e) {
+      this.state = { view: "error", errorMsg: "Room not found or full." };
+      this.render();
     }
-    return `${this.gameURL}#${query.stringify(hashParams)}`;
   }
 
-  centeredText(text) {
-    return html`<div
-      style="display: flex; width: 100%; height: 100%; align-items: center; justify-content: center;"
-    >
-      <div style="font-size: 1.5em;">${text}</div>
-    </div>`;
+  startPublic() {
+    this.state = { view: "matchmaking" };
+    this.render();
+    this.matchmaker.startPublicMatchmaking();
   }
 
-  menuContent() {
-    if (this.state.kind === "connecting-to-server") {
-      return this.centeredText("Connecting to NetplayJS server...");
-    } else if (this.state.kind === "registered") {
-      return html` <div
-        style="display: grid; width: 100%; height: 100%; grid-template-columns: 1fr 1px 1fr; grid-column-gap: 10px;"
-      >
-        <div
-          style="display: flex; flex-direction: column; align-items: center;"
-        >
-          <h1 style="margin: 5px;">Public Match</h1>
-          <p>Play with random strangers on the internet.</p>
-          <button
-            style="font-size: 1.5em; background-color: #4CAF50; color: white; padding: 0.5em; border: none; cursor: pointer;"
-            @click=${() => this.startMatchmaking()}
-          >
-            Start Matchmaking
-          </button>
-        </div>
-        <div
-          style="display: flex; width: 100%; height: 100%; align-items: center; justify-content: center;"
-        >
-          <div style="background-color: black; width: 1px; height: 75%;"></div>
-        </div>
-
-        <div
-          style="display: flex; flex-direction: column; align-items: center;"
-        >
-          <h1 style="margin: 5px;">Private Match</h1>
-          <p>Invite players to a game via a link or QR code.</p>
-          Join URL (send this to a friend):
-
-          <a target="_blank" href="${this.state.joinURL}">
-            ${this.state.joinURL}
-          </a>
-          <div>${this.state.qrCanvas}</div>
-        </div>
-      </div>`;
-    } else if (this.state.kind === "connecting-to-host") {
-      return this.centeredText("Connecting to host...");
-    } else if (this.state.kind === "searching-for-matches") {
-      return this.centeredText("Searching for matches...");
-    } else if (this.state.kind === "hosting-public-match") {
-      return this.centeredText(
-        "You are the host. Waiting for client to connect..."
-      );
-    } else if (this.state.kind === "connection-closed") {
-      return this.centeredText("The connection was closed...");
-    }
+  reset() {
+      this.matchmaker.stopPublicMatchmaking();
+      this.state = { view: "home" };
+      this.render();
   }
 
   render() {
-      render(
-          html`
-              ${this.menuContent()}
-              <div style="position: absolute; right: 10px; bottom: 10px;">
-                  <a
-                        target="_blank"
-                        style="text-decoration: none; color: black;"
-                        href="https://github.com/rameshvarun/netplayjs"
-                  >
-                    <!-- 2. Use pkg.version instead of require(...) -->
-                    NetplayJS v${pkg.version}
-                </a>
+    const content = () => {
+      switch (this.state.view) {
+        case "home":
+          return html`
+            <div style="display:flex; flex-direction:column; gap:20px; text-align:center;">
+              <h1>Passe Trappe</h1>
+              <button @click=${() => this.startPublic()} style="padding:15px; font-size:1.2em; cursor:pointer;">
+                Find Public Match
+              </button>
+              <hr style="width:100%"/>
+              <button @click=${() => this.createPrivate()} style="padding:10px; font-size:1em; cursor:pointer;">
+                Create Private Room
+              </button>
+              <div style="display:flex; gap:5px;">
+                <input id="roomInput" type="text" maxlength="6" placeholder="111111" style="padding:10px; font-size:1em; width:100px; text-align:center; letter-spacing: 2px;">
+                <button @click=${() => {
+                    const val = (document.getElementById('roomInput') as HTMLInputElement).value;
+                    this.joinPrivate(val);
+                }} style="padding:10px; cursor:pointer;">Join</button>
+              </div>
             </div>
-        `,
-      this.root
-  );
+          `;
+        case "hosting":
+          return html`
+            <div style="text-align:center;">
+              <h2>Waiting for Player...</h2>
+              ${this.state.roomId 
+                ? html`<div style="font-size:3em; letter-spacing:5px; font-weight:bold; margin:20px;">${this.state.roomId}</div>`
+                : html`<p>Generating Code...</p>`
+              }
+              <p>Share this code with a friend.</p>
+              <button @click=${() => this.reset()}>Cancel</button>
+            </div>
+          `;
+        case "matchmaking":
+          return html`
+            <div style="text-align:center;">
+              <h2>Looking for opponent...</h2>
+              <div class="spinner"></div> 
+              <p>Please wait...</p>
+              <button @click=${() => this.reset()}>Cancel</button>
+            </div>
+          `;
+        case "joining":
+          return html`<h2>Connecting to Room...</h2>`;
+        case "error":
+          return html`
+            <div style="text-align:center; color: red;">
+              <h2>Error</h2>
+              <p>${this.state.errorMsg}</p>
+              <button @click=${() => this.reset()}>Back</button>
+            </div>
+          `;
+      }
+    };
 
-    if (this.state.kind === "game-in-progress") {
-      this.root.style.display = "none";
-    } else {
-      this.root.style.display = "inherit";
-    }
-  }
-
-  createRootElement(): HTMLDivElement {
-    // Create menu UI
-    const menu = document.createElement("div");
-    menu.style.zIndex = "1";
-    menu.style.position = "absolute";
-    menu.style.backgroundColor = "white";
-    menu.style.padding = "10px";
-    menu.style.left = "50%";
-    menu.style.top = "50%";
-    menu.style.boxShadow = "0px 0px 10px black";
-    menu.style.transform = "translate(-50%, -50%)";
-
-    menu.style.boxSizing = "border-box";
-    menu.style.borderRadius = "5px";
-
-    menu.style.width = "960px";
-    menu.style.height = "400px";
-
-    menu.style.maxWidth = "95%";
-    menu.style.maxHeight = "95%";
-    menu.style.fontFamily = "sans-serif";
-
-    document.body.appendChild(menu);
-
-    return menu;
+    render(content(), this.root);
   }
 }
-
 
