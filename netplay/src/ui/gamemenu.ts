@@ -95,7 +95,7 @@ export class GameMenu {
       this.render();
   }
 
-  render() {alert(4)
+  render() {
     const content = () => {
       switch (this.state.view) {
         case "home":
@@ -103,11 +103,11 @@ export class GameMenu {
             <div style="display:flex; flex-direction:column; gap:20px; text-align:center;">
               <h1>Passe Trappe</h1>
               <button @click=${() => this.startPublic()} style="padding:15px; font-size:1.2em; cursor:pointer;">
-                Find RPublic Match
+                Find Public Match
               </button>
               <hr style="width:100%"/>
               <button @click=${() => this.createPrivate()} style="padding:10px; font-size:1em; cursor:pointer;">
-                Create RPrivate Room
+                Create Private Room
               </button>
               <div style="display:flex; gap:5px;">
                 <input id="roomInput" type="text" maxlength="6" placeholder="111111" style="padding:10px; font-size:1em; width:100px; text-align:center; letter-spacing: 2px;">

@@ -21,7 +21,7 @@ export class GameScene {
     this.scene.background = new THREE.Color(0x222222);
 
     // Camera Setup
-    const radius = 29;
+    const radius = 25;
     const angle = 45;
     const verticalShift = 2;
     const rads = THREE.MathUtils.degToRad(angle);

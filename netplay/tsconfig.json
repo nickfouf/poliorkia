@@ -10,10 +10,14 @@
             "netplayjs": ["src/index.ts"]
         },
 
+        // <--- ADD THESE TWO LINES:
+        "outDir": "./dist",    
+        "rootDir": "./src",
+        // <--- END ADDITION
+
         "allowJs": true,
         "skipLibCheck": true,
 
-        // Emit declaration files for references
         "declaration": true,
         "declarationDir": "../../dist/dist/types/netplay",
         "emitDeclarationOnly": true,
@@ -29,6 +33,7 @@
     "exclude": [
         "**/*.test.ts",
         "**/*.spec.ts",
-        "node_modules"   // <-- top-level
+        "node_modules",
+        "dist" // <--- ALSO ADD THIS to exclude the output folder
     ]
 }
