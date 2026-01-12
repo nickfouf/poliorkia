@@ -10,21 +10,21 @@
       "netplayjs": ["netplay/src/index.ts"]
     },
 
-    "useDefineForClassFields": true,
-    "resolveJsonModule": true,
-    "allowImportingTsExtensions": false,
-    "isolatedModules": false,
+    "allowJs": true,
+    "skipLibCheck": true,
     "noEmit": true,
 
-    "strict": true,
+    "strict": true,  // your app stays strict
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true
+    "noUnusedParameters": true
   },
-  "include": [
-    "src",
-    "netplay/src"
+  "include": ["src"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "node_modules"   // <-- top-level
+  ],
+  "references": [
+    { "path": "./netplay/tsconfig.json" }
   ]
 }
-

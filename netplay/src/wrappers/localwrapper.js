@@ -1,0 +1,89 @@
+import { DefaultInputReader } from "../defaultinput";
+import { NetplayPlayer } from "../netcode/types";
+export class LocalWrapper {
+    getPlayers(instanceID, numPlayers) {
+        let players = [];
+        for (let i = 0; i < numPlayers; ++i) {
+            players.push(new NetplayPlayer(i, i == instanceID, i == 0));
+        }
+        return players;
+    }
+    constructor(gameClass) {
+        Object.defineProperty(this, "gameClass", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: void 0
+        });
+        Object.defineProperty(this, "instances", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
+        });
+        this.gameClass = gameClass;
+        let numPlayers = 2;
+        if (typeof gameClass.numPlayers == "number") {
+            numPlayers = gameClass.numPlayers;
+        }
+        else if (typeof gameClass.numPlayers == "object") {
+            numPlayers = parseInt(prompt(`How many players should there be?`));
+            if (numPlayers > gameClass.numPlayers.max ||
+                numPlayers < gameClass.numPlayers.min) {
+                alert(`Invalid number of players.`);
+                numPlayers = gameClass.numPlayers.max;
+            }
+        }
+        document.body.style.padding = "5px";
+        for (let i = 0; i < numPlayers; ++i) {
+            // Create canvas for game.
+            const canvas = document.createElement("canvas");
+            const pixelRatio = (gameClass.highDPI && window.devicePixelRatio) ?
+                window.devicePixelRatio : 1;
+            canvas.width = gameClass.canvasSize.width * pixelRatio;
+            canvas.height = gameClass.canvasSize.height * pixelRatio;
+            canvas.tabIndex = 0;
+            canvas.style.backgroundColor = "black";
+            canvas.style.boxShadow = "0px 0px 10px black";
+            canvas.style.margin = "5px";
+            canvas.style.width = `${gameClass.canvasSize.width}px`;
+            canvas.style.height = `${gameClass.canvasSize.height}px`;
+            document.body.appendChild(canvas);
+            // Create input reader.
+            const inputReader = new DefaultInputReader(canvas, canvas, this.gameClass.canvasSize, this.gameClass.pointerLock || false, this.gameClass.preventContextMenu || false, {});
+            // Create game.
+            const players = this.getPlayers(i, numPlayers);
+            const game = new this.gameClass(canvas, players);
+            this.instances.push({
+                canvas,
+                inputReader,
+                game,
+                players,
+            });
+        }
+    }
+    start() {
+        let lastTimestamp = performance.now();
+        let animate = (timestamp) => {
+            if (timestamp >= lastTimestamp + this.gameClass.timestep) {
+                // Reset the timestamp.
+                lastTimestamp = timestamp;
+                // Query each of our input readers.
+                let instanceInputs = this.instances.map((inst) => inst.inputReader.getInput());
+                for (let instance of this.instances) {
+                    let inputs = new Map();
+                    instance.players.forEach((player, i) => {
+                        inputs.set(player, instanceInputs[i]);
+                    });
+                    // Tick game state forward.
+                    instance.game.tick(inputs);
+                    // Draw state to canvas.
+                    instance.game.draw(instance.canvas);
+                }
+            }
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+    }
+}
+//# sourceMappingURL=localwrapper.js.map

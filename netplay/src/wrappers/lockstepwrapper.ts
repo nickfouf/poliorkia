@@ -58,7 +58,8 @@ export class LockstepWrapper extends GameWrapper {
 
     console.log("Client has connected... Starting game...");
 
-    this.startGameLoop();
+    // FIX: Pass conn to the loop
+    this.startGameLoop(conn);
   }
 
   startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
@@ -94,10 +95,13 @@ export class LockstepWrapper extends GameWrapper {
     });
 
     console.log("Successfully connected to server... Starting game...");
-    this.startGameLoop();
+    
+    // FIX: Pass conn to the loop
+    this.startGameLoop(conn);
   }
 
-  startGameLoop() {
+  // FIX: Accept conn as argument
+  startGameLoop(conn: FirebasePeerConnection) {
     this.stats.style.display = "inherit";
 
     // Start the netcode game loop.
@@ -131,4 +135,3 @@ export class LockstepWrapper extends GameWrapper {
     requestAnimationFrame(animate);
   }
 }
-

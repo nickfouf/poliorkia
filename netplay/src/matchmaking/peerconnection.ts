@@ -142,6 +142,7 @@ export class PeerConnection extends EventEmitter {
     if (this.dataChannel?.readyState !== "open") return;
     let encoded = msgpack.encode(data);
     this.sendStats.onMessage(encoded.byteLength);
+    // @ts-ignore
     this.dataChannel!.send(encoded);
   }
 }

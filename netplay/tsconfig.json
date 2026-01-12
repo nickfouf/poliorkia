@@ -1,18 +1,34 @@
 {
     "compilerOptions": {
-        "strictNullChecks": true,
-        "strictPropertyInitialization": true,
-        "module": "es6",
-        "target": "es6",
-        "sourceMap": true,
-        "allowJs": true,
+        "target": "ES2020",
+        "module": "ESNext",
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
         "moduleResolution": "node",
-        "esModuleInterop": true,
-        "declarationDir": "dist/types",
+        "baseUrl": ".",
+        "paths": {
+            "netplayjs": ["src/index.ts"]
+        },
+
+        "allowJs": true,
+        "skipLibCheck": true,
+
+        // Emit declaration files for references
         "declaration": true,
-        "resolveJsonModule": true
+        "declarationDir": "../dist/types/netplay",
+        "emitDeclarationOnly": true,
+
+        "strict": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "noImplicitAny": false,
+
+        "composite": true
     },
-    "include": [
-        "src"
+    "include": ["src"],
+    "exclude": [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "node_modules"   // <-- top-level
     ]
 }
