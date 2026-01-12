@@ -13,6 +13,7 @@ import EWMASD from "../ewmasd";
 
 // Use Firebase Client instead of old WebSocket client
 import { FirebasePeerConnection } from "../matchmaking/firebase-client";
+alert(34)
 
 const PING_INTERVAL = 100;
 
