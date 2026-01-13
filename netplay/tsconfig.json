@@ -10,10 +10,8 @@
             "netplayjs": ["src/index.ts"]
         },
 
-        // <--- ADD THESE TWO LINES:
         "outDir": "./dist",    
         "rootDir": "./src",
-        // <--- END ADDITION
 
         "allowJs": true,
         "skipLibCheck": true,
@@ -27,13 +25,16 @@
         "noUnusedParameters": false,
         "noImplicitAny": false,
 
-        "composite": true
+        "composite": true,
+        "resolveJsonModule": true,
+        "esModuleInterop": true
     },
     "include": ["src"],
     "exclude": [
         "**/*.test.ts",
         "**/*.spec.ts",
         "node_modules",
-        "dist" // <--- ALSO ADD THIS to exclude the output folder
+        "dist"
     ]
 }
+

@@ -11,106 +11,76 @@ import * as lit from "lit-html";
 import { GameMenu } from "../ui/gamemenu";
 import EWMASD from "../ewmasd";
 
-// Use Firebase Client instead of old WebSocket client
 import { FirebasePeerConnection } from "../matchmaking/firebase-client";
+import strings from "../strings.json";
 
 const PING_INTERVAL = 100;
 
 export abstract class GameWrapper {
   gameClass: GameClass;
-
-  /** The canvas that the game will be rendered onto. */
   canvas: HTMLCanvasElement;
-
-  /** The network stats UI. */
   stats: HTMLDivElement;
-
   inputReader: DefaultInputReader;
-
-  isChannelOrdered(channel: RTCDataChannel) {
-    return channel.ordered;
-  }
-
-  isChannelReliable(channel: RTCDataChannel) {
-    return (
-      channel.maxPacketLifeTime === null && channel.maxRetransmits === null
-    );
-  }
-
-  checkChannel(channel: RTCDataChannel) {
-    assert.isTrue(
-      this.isChannelOrdered(channel),
-      "Data Channel must be ordered."
-    );
-    assert.isTrue(this.isChannelReliable(channel), "Channel must be reliable.");
-  }
-
   playerPausedIndicator: HTMLDivElement;
+
+  isChannelOrdered(channel: RTCDataChannel) { return channel.ordered; }
+  isChannelReliable(channel: RTCDataChannel) { return (channel.maxPacketLifeTime === null && channel.maxRetransmits === null); }
+  checkChannel(channel: RTCDataChannel) { assert.isTrue(this.isChannelOrdered(channel)); assert.isTrue(this.isChannelReliable(channel)); }
 
   constructor(gameClass: GameClass) {
     this.gameClass = gameClass;
 
-    // Create canvas for game.
+    // Create canvas
     this.canvas = document.createElement("canvas");
-
-    const pixelRatio = (gameClass.highDPI && window.devicePixelRatio) ?
-      window.devicePixelRatio : 1;
-
-    this.canvas.width = gameClass.canvasSize.width * pixelRatio;
-    this.canvas.height = gameClass.canvasSize.height * pixelRatio;
-
-    this.canvas.style.backgroundColor = "black";
+    // We will set dimensions in resize()
+    this.canvas.style.backgroundColor = "transparent";
     this.canvas.style.position = "absolute";
     this.canvas.style.zIndex = "0";
-    this.canvas.style.boxShadow = "0px 0px 10px black";
+    
+    // --- CHANGE: Hide canvas initially so we see the menu background ---
+    this.canvas.style.display = "none"; 
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
-
     document.body.appendChild(this.canvas);
 
-    // Create stats UI
+    // Create stats UI (HIDDEN)
     this.stats = document.createElement("div");
     this.stats.style.zIndex = "1";
     this.stats.style.position = "absolute";
     this.stats.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
     this.stats.style.color = "white";
     this.stats.style.padding = "5px";
-    this.stats.style.display = "none";
-
+    this.stats.style.display = "none"; // FORCE HIDE
     document.body.appendChild(this.stats);
 
-    // Create browser background info,
+    // Create browser background info (Translated to Greek)
     this.playerPausedIndicator = (() => {
       const div = document.createElement("div");
       div.style.zIndex = "1";
       div.style.position = "absolute";
-      div.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+      div.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
       div.style.color = "white";
-      div.style.padding = "10px";
+      div.style.padding = "15px";
+      div.style.borderRadius = "10px";
       div.style.left = "50%";
       div.style.top = "50%";
       div.style.transform = "translate(-50%, -50%)";
-
       div.style.boxSizing = "border-box";
-      div.style.fontFamily = "sans-serif";
+      div.style.fontFamily = "'Nunito', sans-serif";
+      div.style.textAlign = "center";
       div.innerHTML = `
-      <p align="center" style="margin: 3px">The other player has minimized or hidden their tab.</p>
-      <p align="center" style="margin: 3px">The game may run slowly until they return.</p>
+      <h3 style="margin: 0 0 10px 0; color: #ff9f43;">${strings.game.opponent_away_title}</h3>
+      <p style="margin: 3px">${strings.game.opponent_away_desc}</p>
+      <p style="margin: 3px; font-size: 0.9em; opacity: 0.8;">${strings.game.opponent_away_note}</p>
       `;
       div.style.display = "none";
-
       document.body.appendChild(div);
       return div;
     })();
 
-    if (
-      this.gameClass.touchControls &&
-      window.navigator.userAgent.toLowerCase().includes("mobile")
-    ) {
-      for (let [name, control] of Object.entries(
-        this.gameClass.touchControls
-      )) {
+    if (this.gameClass.touchControls && window.navigator.userAgent.toLowerCase().includes("mobile")) {
+      for (let [name, control] of Object.entries(this.gameClass.touchControls)) {
         control.show();
       }
     }
@@ -125,96 +95,62 @@ export abstract class GameWrapper {
     );
   }
 
-  /**
-   * Calculate a scaling for our canvas so that it fits the whole screen.
-   * Center the canvas with an offset.
-   */
-  calculateLayout(
-    container: { width: number; height: number },
-    canvas: { width: number; height: number }
-  ): { width: number; height: number; left: number; top: number } {
-    const widthRatio = container.width / canvas.width;
-    const heightRatio = container.height / canvas.height;
+  // Calculate Layout removed - we use full screen now
 
-    // We are constrained by the height of the canvas.
-    const heightLimited = canvas.width * heightRatio >= container.width;
-
-    const ratio = heightLimited ? widthRatio : heightRatio;
-
-    let width = canvas.width * ratio;
-    let height = canvas.height * ratio;
-
-    let left = 0;
-    let top = 0;
-
-    if (heightLimited) {
-      top = container.height / 2 - height / 2;
-    } else {
-      left = container.width / 2 - width / 2;
-    }
-
-    return { width, height, left, top };
-  }
-
-  /**
-   * Recalculate canvas scaling / offset.
-   */
   resize() {
-    const layout = this.calculateLayout(
-      { width: window.innerWidth, height: window.innerHeight },
-      this.gameClass.canvasSize
-    );
-    log.debug("Calculating new layout: %o", layout);
+    const pixelRatio = (this.gameClass.highDPI && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-    this.canvas.style.width = `${layout.width}px`;
-    this.canvas.style.height = `${layout.height}px`;
+    // Set internal resolution
+    this.canvas.width = width * pixelRatio;
+    this.canvas.height = height * pixelRatio;
 
-    this.canvas.style.top = `${layout.top}px`;
-    this.canvas.style.left = `${layout.left}px`;
+    // Set CSS to fill window
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = "100%";
+    this.canvas.style.left = "0px";
+    this.canvas.style.top = "0px";
+
+    // Propagate resize to game
+    const gameInstance = (this as any).game;
+    if (gameInstance) {
+        gameInstance.resize(this.canvas.width, this.canvas.height);
+    }
   }
 
   async start() {
     const gameMenu = new GameMenu();
 
     gameMenu.onClientStart.once((conn) => {
-      const players = [
-        new NetplayPlayer(0, false, true), // Player 0 is our peer, the host.
-        new NetplayPlayer(1, true, false), // Player 1 is us, a client
-      ];
-
+      this.canvas.style.display = "block";
+      const players = [new NetplayPlayer(0, false, true), new NetplayPlayer(1, true, false)];
       this.watchRTCStats(conn.peerConnection);
       this.startPing(conn);
       this.startVisibilityWatcher(conn);
-
       this.startClient(players, conn);
+      // Trigger resize once game is created to ensure aspect ratio is correct
+      this.resize();
     });
 
     gameMenu.onHostStart.once((conn) => {
-      // Construct the players array.
-      const players: Array<NetplayPlayer> = [
-        new NetplayPlayer(0, true, true), // Player 0 is us, acting as a host.
-        new NetplayPlayer(1, false, false), // Player 1 is our peer, acting as a client.
-      ];
-
+      this.canvas.style.display = "block";
+      const players = [new NetplayPlayer(0, true, true), new NetplayPlayer(1, false, false)];
       this.watchRTCStats(conn.peerConnection);
       this.startPing(conn);
       this.startVisibilityWatcher(conn);
-
       this.startHost(players, conn);
+      // Trigger resize once game is created to ensure aspect ratio is correct
+      this.resize();
     });
   }
 
   startVisibilityWatcher(conn: FirebasePeerConnection) {
-    // Send the current tab visibility to the other player.
     conn.send({ type: "visibility-state", value: document.visibilityState });
-
-    // Update the other player on our tab visibility.
     document.addEventListener("visibilitychange", () => {
       log.debug(`My visibility state changed to: ${document.visibilityState}.`);
       conn.send({ type: "visibility-state", value: document.visibilityState });
     });
-
-    // Show an indicator if the other player's tab is invisible.
     conn.on("data", (data) => {
       if (data.type === "visibility-state") {
         if (data.value === "hidden") {
@@ -231,7 +167,6 @@ export abstract class GameWrapper {
     setInterval(() => {
       conn.send({ type: "ping-req", sent_time: performance.now() });
     }, PING_INTERVAL);
-
     conn.on("data", (data) => {
       if (data.type == "ping-req") {
         conn.send({ type: "ping-resp", sent_time: data.sent_time });
@@ -244,17 +179,12 @@ export abstract class GameWrapper {
   renderRTCStats(stats: RTCStatsReport): lit.TemplateResult {
     return lit.html`
       <details>
-        <summary>WebRTC Stats</summary>
-        ${[...stats.values()].map(
-          (report) =>
-            lit.html`<div style="margin-left: 10px;">
+        <summary>${strings.game.webrtc_stats_title}</summary>
+        ${[...stats.values()].map((report) => lit.html`
+          <div style="margin-left: 10px;">
             <details>
               <summary>${report.type}</summary>
-              ${Object.entries(report).map(([key, value]) => {
-                if (key !== "type") {
-                  return lit.html`<div style="margin-left: 10px;">${key}: ${report[key]}</div>`;
-                }
-              })}
+              ${Object.entries(report).map(([key, value]) => { if (key !== "type") return lit.html`<div style="margin-left: 10px;">${key}: ${report[key]}</div>`; })}
             </details>
           </div>`
         )}
@@ -266,10 +196,7 @@ export abstract class GameWrapper {
   async watchRTCStats(connection: RTCPeerConnection) {
     const stats = await connection.getStats();
     this.rtcStats = this.renderRTCStats(stats);
-
-    setTimeout(async () => {
-      await this.watchRTCStats(connection);
-    }, 1000);
+    setTimeout(async () => { await this.watchRTCStats(connection); }, 1000);
   }
 
   abstract startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection);

@@ -55,6 +55,8 @@ export type GameClass = {
 
 export abstract class Game extends NetplayState<DefaultInput> {
   abstract draw(canvas: HTMLCanvasElement);
+  
+  // ADDED: Optional resize method for dynamic layouts
+  resize(width: number, height: number): void {}
 }
-
 

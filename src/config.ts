@@ -1,6 +1,6 @@
 export const RUBBER_BAND = {
   STIFFNESS: 200.0,
-  POWER_CURVE: 13,
+  POWER_CURVE: 15,
   CENTERING: 0.01,
   DAMPING: 0.998,
   ANCHOR_Z: 7.8,
@@ -39,7 +39,7 @@ export const NAILS_POSITIONS = [
 ];
 
 export const PHYSICS = {
-  FRICTION: 0.93,
+  FRICTION: 0.90,
   SUBSTEPS: 10,
   TIMESTEP: 1000 / 60,
 };
@@ -52,6 +52,8 @@ export const VISUALS = {
   CANVAS_WIDTH: 600,
   CANVAS_HEIGHT: 900,
 };
+
+
 
 
 

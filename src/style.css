@@ -1,0 +1,242 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+:root {
+  /* Vibrant "Happy" Palette */
+  --bg-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --card-bg: #ffffff;
+  --text-main: #2d3436;
+  --text-muted: #636e72;
+
+  /* Buttons */
+  --primary-color: #ff9f43; /* Fun Orange */
+  --primary-shadow: #c97322; /* Darker orange for shadow */
+  
+  --secondary-color: #54a0ff; /* Bright Blue */
+  --secondary-shadow: #256bbd; /* Darker blue for shadow */
+  
+  --danger-color: #ff6b6b;
+  --ghost-bg: #dfe6e9;
+  --ghost-shadow: #b2bec3;
+
+  /* UI Shapes */
+  --card-radius: 30px;
+  --btn-radius: 50px;
+  --input-radius: 15px;
+  --font-stack: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-gradient);
+  font-family: var(--font-stack);
+  color: var(--text-main);
+  user-select: none;
+}
+
+/* --- Menu Overlay --- */
+.game-menu-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- Menu Card --- */
+.menu-card {
+    background-color: var(--card-bg);
+    border-radius: var(--card-radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 420px;
+    text-align: center;
+    border: 4px solid #ffffff;
+    animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-title {
+  margin-top: 0;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #0984e3;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0px #74b9ff;
+}
+
+/* Updated logo class */
+.menu-logo {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    margin: 3rem 0 2rem;
+}
+
+.menu-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.menu-divider {
+  border: 0;
+  height: 2px;
+  background: #dfe6e9;
+  margin: 1.5rem 0;
+  border-radius: 2px;
+  width: calc(100% - 2 * 3rem);
+}
+
+/* --- Bouncy Buttons (Fixed Layout Shift) --- */
+.btn {
+    display: block;
+    width: calc(100% - 2 * 3rem);
+    padding: 16px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: var(--btn-radius);
+    font-size: 1.1rem;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: var(--font-stack);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-sizing: border-box;
+    position: relative;
+    top: 0;
+    transition: all 0.1s;
+}
+
+.btn:active {
+  /* Move down visually */
+  top: 4px;
+  /* Reduce shadow to simulate press */
+  box-shadow: 0 2px 0 var(--btn-shadow-color) !important;
+}
+
+/* Colors defined with shadow variables */
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 6px 0 var(--primary-shadow);
+  --btn-shadow-color: var(--primary-shadow);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+  box-shadow: 0 6px 0 var(--secondary-shadow);
+  --btn-shadow-color: var(--secondary-shadow);
+}
+
+.btn-ghost {
+  background-color: var(--ghost-bg);
+  color: #636e72;
+  box-shadow: 0 6px 0 var(--ghost-shadow);
+  --btn-shadow-color: var(--ghost-shadow);
+}
+
+.btn-inline {
+  width: auto;
+  display: inline-block;
+  margin-bottom: 0;
+  padding: 12px 24px;
+}
+
+/* --- Form Elements --- */
+.input-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+    padding: 0 10px;
+}
+
+.code-input {
+  background-color: #f1f2f6;
+  border: 3px solid #dfe6e9;
+  color: var(--text-main);
+  border-radius: var(--input-radius);
+  padding: 12px;
+  font-size: 1.5rem;
+  text-align: center;
+  letter-spacing: 0.2em;
+  width: 160px;
+  font-family: 'Nunito', monospace;
+  font-weight: 800;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.code-input:focus {
+  border-color: var(--secondary-color);
+  background-color: #fff;
+}
+
+.code-display {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: 0.3rem;
+  color: var(--primary-color);
+  margin: 1rem 0;
+  font-family: 'Nunito', monospace;
+  background: #f1f2f6;
+  padding: 1rem;
+  border-radius: var(--input-radius);
+  border: 3px dashed #dfe6e9;
+}
+
+/* --- Status & Loading --- */
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid var(--secondary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem auto;
+}
+
+.error-msg {
+  color: #fff;
+  background: var(--danger-color);
+  padding: 1rem;
+  border-radius: var(--input-radius);
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.hidden {
+  display: none !important;
+}

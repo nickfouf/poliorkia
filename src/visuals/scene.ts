@@ -15,10 +15,38 @@ export class GameScene {
   puliMeshes: Map<number, THREE.Mesh> = new Map();
   rubberBand: RubberBandVisuals;
 
+  // Animation Timing Constants (ms)
+  private readonly INITIAL_BLACK_DURATION = 500;  // Stay black for 0.5s
+  private readonly FADE_DURATION = 1500;          // Fade in over 1.5s
+  private readonly POST_FADE_WAIT = 1000;         // Wait 2s after fade
+  private readonly CAMERA_MOVE_DURATION = 2000;   // Move camera over 2.5s
+
+  // Derived: When does the camera start moving?
+  // 0.5 + 1.5 + 2.0 = 4.0 seconds total wait
+  private readonly CAMERA_START_TIME = this.INITIAL_BLACK_DURATION + this.FADE_DURATION + this.POST_FADE_WAIT;
+
+  private animStartTime: number;
+  private isAnimating: boolean = true;
+  
+  private introPosition: THREE.Vector3;
+  private introLookAt: THREE.Vector3;
+  private finalPosition: THREE.Vector3;
+  private finalLookAt: THREE.Vector3;
+
+  // Fade Overlay
+  private fadeOverlay: THREE.Mesh;
+
   constructor(canvas: HTMLCanvasElement, localPlayerId: number) {
     this.scene = new THREE.Scene();
-    // Exact color from original code
-    this.scene.background = new THREE.Color(0x222222);
+
+    // --- Studio Environment Colors ---
+    // Light Sky Blue
+    const backgroundColor = 0x87CEFA; 
+    this.scene.background = new THREE.Color(backgroundColor);
+    
+    // Fog helps fade the grid lines into the distance
+    this.scene.fog = new THREE.Fog(backgroundColor, 30, 100);
+    // ------------------------------------------
 
     // Camera Setup
     const radius = 25;
@@ -28,33 +56,160 @@ export class GameScene {
     const y = radius * Math.cos(rads);
     const z = radius * Math.sin(rads);
 
-    this.camera0 = new THREE.PerspectiveCamera(40, VISUALS.CANVAS_WIDTH / VISUALS.CANVAS_HEIGHT, 0.1, 100);
+    // Initial aspect ratio (will be updated immediately by resize)
+    const aspect = VISUALS.CANVAS_WIDTH / VISUALS.CANVAS_HEIGHT;
+
+    this.camera0 = new THREE.PerspectiveCamera(40, aspect, 0.1, 150);
     this.camera0.position.set(0, y, -(z + verticalShift));
     this.camera0.lookAt(0, 0, -verticalShift);
     this.camera0.updateMatrixWorld();
 
-    this.camera1 = new THREE.PerspectiveCamera(40, VISUALS.CANVAS_WIDTH / VISUALS.CANVAS_HEIGHT, 0.1, 100);
+    this.camera1 = new THREE.PerspectiveCamera(40, aspect, 0.1, 150);
     this.camera1.position.set(0, y, z + verticalShift);
     this.camera1.lookAt(0, 0, verticalShift);
     this.camera1.updateMatrixWorld();
 
     this.camera = (localPlayerId === 0) ? this.camera0 : this.camera1;
 
+    // --- Fade In Setup ---
+    this.scene.add(this.camera);
+
+    const fadeGeo = new THREE.PlaneGeometry(10, 10);
+    const fadeMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 1.0,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false
+    });
+    this.fadeOverlay = new THREE.Mesh(fadeGeo, fadeMat);
+    this.fadeOverlay.position.set(0, 0, -0.2); 
+    this.fadeOverlay.renderOrder = 9999; 
+    this.camera.add(this.fadeOverlay);
+    // ---------------------
+
+    // --- Animation Initialization ---
+    this.animStartTime = performance.now();
+
+    this.finalPosition = this.camera.position.clone();
+    this.finalLookAt = new THREE.Vector3(0, 0, (localPlayerId === 0) ? -verticalShift : verticalShift);
+
+    this.introPosition = new THREE.Vector3(-22, 10, 0); 
+    this.introLookAt = new THREE.Vector3(0, 0, 0);
+
+    this.camera.position.copy(this.introPosition);
+    this.camera.lookAt(this.introLookAt);
+    // --------------------------------
+
     // Renderer Setup
-    this.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
-    // Original Tone Mapping Settings
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0; 
-    // Note: No outputColorSpace setting needed for 0.148.0 to match original
 
     // Build World
+    this.buildEnvironment(); 
     this.buildBoard();
+    this.loadTable();
     this.setupLights();
     
     this.rubberBand = new RubberBandVisuals(this.scene);
+  }
+
+  // --- Solid Floor + Grid ---
+  private buildEnvironment() {
+      // 1. The Floor (Solid color)
+      // Stronger Yellow to appear "white-yellow" on screen
+      const floorGeo = new THREE.PlaneGeometry(300, 300);
+      const floorMat = new THREE.MeshStandardMaterial({
+          color: 0xffe066, 
+          roughness: 1.0,
+          metalness: 0.0
+      });
+
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -8.0; 
+      floor.receiveShadow = true;
+      this.scene.add(floor);
+
+      // 2. The Grid
+      const gridSize = 300;
+      const gridDivisions = 60;
+      
+      // Gray grid lines for contrast against the yellow floor
+      const gridColor = 0x808080; 
+      const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor);
+      gridHelper.position.y = -7.9; 
+      
+      const gridMat = gridHelper.material as THREE.Material;
+      gridMat.transparent = true;
+      gridMat.opacity = 0.4;
+      
+      this.scene.add(gridHelper);
+  }
+
+  // Handle dynamic resize
+  resize(width: number, height: number) {
+      this.renderer.setSize(width, height, false);
+      
+      const aspect = width / height;
+      
+      // Update both cameras
+      [this.camera0, this.camera1].forEach(cam => {
+          cam.aspect = aspect;
+          
+          if (aspect < 0.6) {
+              cam.fov = 40 * (0.6 / aspect); 
+          } else {
+              cam.fov = 40;
+          }
+          cam.updateProjectionMatrix();
+      });
+  }
+
+  private loadTable() {
+    const loader = new GLTFLoader();
+    loader.load("assets/table.glb", (gltf) => {
+        const object = gltf.scene;
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const targetWidth = BOARD.WIDTH * 1.3;
+
+        if (size.x > 0) {
+            const scale = targetWidth / size.x;
+            object.scale.set(scale, scale, scale);
+            object.position.x = -center.x * scale;
+            object.position.z = -center.z * scale;
+            const boardBottomY = -BOARD.BASE_THICKNESS / 2;
+            const tableTopY = box.max.y * scale;
+            object.position.y = boardBottomY - tableTopY;
+            object.traverse((child) => {
+                if ((child as THREE.Mesh).isMesh) {
+                    // --- Disable Shadow Casting for Table ---
+                    child.castShadow = false; 
+                    child.receiveShadow = true;
+                    const mesh = child as THREE.Mesh;
+                    if (mesh.material) {
+                         const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                         materials.forEach(mat => {
+                             if (mat instanceof THREE.MeshStandardMaterial) {
+                                 mat.metalness = 0.1;
+                                 mat.roughness = 0.6;
+                             }
+                         });
+                    }
+                }
+            });
+            this.scene.add(object);
+        }
+    }, undefined, (error) => {
+        console.error("Error loading table.glb:", error);
+    });
   }
 
   createPulis(pulis: PuliState[]) {
@@ -126,7 +281,48 @@ export class GameScene {
     }
   }
 
+  // --- Animation Logic Helper ---
+  private updateAnimationState() {
+    const now = performance.now();
+    const elapsed = now - this.animStartTime;
+
+    if (this.fadeOverlay.visible) {
+        if (elapsed < this.INITIAL_BLACK_DURATION) {
+            (this.fadeOverlay.material as THREE.MeshBasicMaterial).opacity = 1.0;
+        } else if (elapsed < this.INITIAL_BLACK_DURATION + this.FADE_DURATION) {
+            const fadeElapsed = elapsed - this.INITIAL_BLACK_DURATION;
+            const t = fadeElapsed / this.FADE_DURATION;
+            (this.fadeOverlay.material as THREE.MeshBasicMaterial).opacity = 1.0 - t;
+        } else {
+            this.fadeOverlay.visible = false;
+        }
+    }
+
+    if (this.isAnimating) {
+        if (elapsed < this.CAMERA_START_TIME) {
+            this.camera.position.copy(this.introPosition);
+            this.camera.lookAt(this.introLookAt);
+        } else if (elapsed < this.CAMERA_START_TIME + this.CAMERA_MOVE_DURATION) {
+            const moveElapsed = elapsed - this.CAMERA_START_TIME;
+            const t = moveElapsed / this.CAMERA_MOVE_DURATION;
+            const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+            const curPos = new THREE.Vector3().lerpVectors(this.introPosition, this.finalPosition, ease);
+            const curTarget = new THREE.Vector3().lerpVectors(this.introLookAt, this.finalLookAt, ease);
+
+            this.camera.position.copy(curPos);
+            this.camera.lookAt(curTarget);
+        } else {
+            this.camera.position.copy(this.finalPosition);
+            this.camera.lookAt(this.finalLookAt);
+            this.isAnimating = false;
+        }
+    }
+  }
+
   draw(pulis: PuliState[]) {
+    this.updateAnimationState();
+
     for (const p of pulis) {
       const mesh = this.puliMeshes.get(p.id);
       if (mesh) mesh.position.set(p.x, 0.1, p.y);
@@ -170,7 +366,7 @@ export class GameScene {
                 for (const config of borderConfigs) {
                     const localMat = standardMat.clone() as THREE.MeshStandardMaterial;
                     const localTexture = originalTexture.clone();
-                    
+
                     localTexture.wrapS = THREE.RepeatWrapping;
                     localTexture.wrapT = THREE.RepeatWrapping;
                     localTexture.repeat.set(config.w * TEXTURE_DENSITY, config.d * TEXTURE_DENSITY);
@@ -181,7 +377,7 @@ export class GameScene {
                 if (bridgeMesh) {
                     const bridgeMat = standardMat.clone() as THREE.MeshStandardMaterial;
                     const bridgeTex = originalTexture.clone();
-                    
+
                     bridgeTex.wrapS = THREE.RepeatWrapping;
                     bridgeTex.wrapT = THREE.RepeatWrapping;
                     bridgeTex.center.set(0.5, 0.5);
@@ -224,6 +420,34 @@ export class GameScene {
     boardGroup.add(rightSlat);
     borderConfigs.push({ mesh: rightSlat, w: BOARD.SLAT_WIDTH, d: sideH });
 
+    // --- Add Logo on Left Side with Correct Aspect Ratio ---
+    const logoHeight = 0.6;
+    const logoGeo = new THREE.PlaneGeometry(1, 1);
+    const logoMat = new THREE.MeshStandardMaterial({
+        transparent: true,
+        roughness: 0.5,
+        metalness: 0.0,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+    });
+
+    const logoMesh = new THREE.Mesh(logoGeo, logoMat);
+    logoMesh.position.set(-BOARD.WIDTH / 2 - 0.005, posY, 0);
+    logoMesh.rotation.y = -Math.PI / 2;
+    logoMesh.visible = false; 
+    boardGroup.add(logoMesh);
+
+    new THREE.TextureLoader().load("assets/poliorkia_wood.png", (tex) => {
+        tex.encoding = THREE.sRGBEncoding;
+        const aspect = tex.image.width / tex.image.height;
+        logoMesh.scale.set(logoHeight * aspect, logoHeight, 1);
+        logoMat.map = tex;
+        logoMat.needsUpdate = true;
+        logoMesh.visible = true;
+    });
+    // -----------------------------
+
     const shapeH = BOARD.SLAT_HEIGHT - 2 * BOARD.BEVEL_SIZE;
     const shapeD = BOARD.SLAT_WIDTH - 2 * BOARD.BEVEL_SIZE;
     const innerWidth = BOARD.WIDTH - 2 * BOARD.SLAT_WIDTH;
@@ -261,34 +485,19 @@ export class GameScene {
         boardGroup.add(nail);
     }
 
-    const planeGeo = new THREE.PlaneGeometry(100, 100);
-    const planeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = -(BOARD.BASE_THICKNESS / 2 + 0.01);
-    plane.receiveShadow = true;
-    this.scene.add(plane);
-
     this.scene.add(boardGroup);
   }
 
   private setupLights() {
-    // Original Light values
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     this.scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); 
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
     this.scene.add(hemiLight);
-    
-    // Original Light value
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(0, 20, 0);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
   }
 }
-
-
-
-
-

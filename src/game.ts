@@ -105,6 +105,11 @@ export class PasseTrappeGame extends Game {
     this.heldOffsets = value.heldOffsets as { [playerId: number]: { x: number; y: number } | null };
   }
 
+  // ADDED: Handle dynamic resize
+  resize(width: number, height: number) {
+      this.scene.resize(width, height);
+  }
+
   tick(playerInputs: Map<NetplayPlayer, DefaultInput>): void {
     const dt = PasseTrappeGame.timestep / 1000;
 
@@ -129,14 +134,15 @@ export class PasseTrappeGame extends Game {
       // Raycasting logic
       if (screenX !== null && screenY !== null) {
         // --- FIX START ---
-        // We use the actual canvas dimensions from the renderer.
-        // This accounts for dynamic resizing and High DPI scaling automatically.
-        const canvas = this.scene.renderer.domElement;
+        // InputReader normalizes mouse coordinates to the VIRTUAL canvas size (600x900) defined in config.
+        // We must normalize to NDC using that same virtual size, not the physical window size.
+        const virtualWidth = PasseTrappeGame.canvasSize.width;
+        const virtualHeight = PasseTrappeGame.canvasSize.height;
 
         // Map input coordinates to Normalized Device Coordinates (-1..1)
         const ndc = new THREE.Vector2(
-            (screenX / canvas.width) * 2 - 1,
-            -(screenY / canvas.height) * 2 + 1
+            (screenX / virtualWidth) * 2 - 1,
+            -(screenY / virtualHeight) * 2 + 1
         );
         // --- FIX END ---
 
@@ -200,3 +206,4 @@ export class PasseTrappeGame extends Game {
     this.scene.draw(this.pulis);
   }
 }
+

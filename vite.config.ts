@@ -21,6 +21,12 @@ export default defineConfig({
     // Ensure file watcher catches changes in this folder
     watch: {
       ignored: ['!**/netplay/src/**']
+    },
+    host: '0.0.0.0', // listen on all network interfaces
+    port: 5173,      // or whatever port you want
+  },
+    build: {
+        outDir: '../dist', // <-- your custom output directory
     }
-  }
 });
+

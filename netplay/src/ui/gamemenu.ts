@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { FirebaseMatchmaker, FirebasePeerConnection } from "../matchmaking/firebase-client";
 import { TypedEvent } from "@vramesh/netplayjs-common/typedevent";
+import strings from "../strings.json";
 
 export class GameMenu {
   root: HTMLDivElement;
@@ -18,7 +19,7 @@ export class GameMenu {
 
   constructor() {
     this.root = document.createElement("div");
-    this.setupStyles();
+    this.root.className = "game-menu-overlay";
     document.body.appendChild(this.root);
 
     this.matchmaker = new FirebaseMatchmaker();
@@ -36,18 +37,6 @@ export class GameMenu {
     this.render();
   }
 
-  setupStyles() {
-    this.root.style.position = "absolute";
-    this.root.style.width = "100%";
-    this.root.style.height = "100%";
-    this.root.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
-    this.root.style.zIndex = "100";
-    this.root.style.display = "flex";
-    this.root.style.justifyContent = "center";
-    this.root.style.alignItems = "center";
-    this.root.style.fontFamily = "sans-serif";
-  }
-
   async createPrivate() {
     this.state = { view: "hosting" };
     this.render();
@@ -56,16 +45,15 @@ export class GameMenu {
       this.state.roomId = id;
       this.render();
     } catch (e) {
-      this.state = { view: "error", errorMsg: "Could not create room." };
+      this.state = { view: "error", errorMsg: strings.menu.err_create_failed };
       this.render();
     }
   }
 
   async joinPrivate(idInput: string) {
-    // Trim whitespace to prevent "213090 " failing the length check
     const id = idInput.trim();
     if (id.length !== 6) {
-      this.state = { view: "error", errorMsg: "Code must be exactly 6 digits." };
+      this.state = { view: "error", errorMsg: strings.menu.err_invalid_code };
       this.render();
       return;
     }
@@ -76,9 +64,12 @@ export class GameMenu {
     try {
       await this.matchmaker.joinPrivateRoom(id);
     } catch (e: any) {
-      // Show the actual error message from the matchmaker (e.g. "Room not found")
       console.error(e);
-      this.state = { view: "error", errorMsg: e.message || "Connection failed." };
+      let greekError = strings.menu.err_connection_failed;
+      if (e.message && e.message.includes("Room does not exist")) greekError = strings.menu.err_room_not_found;
+      if (e.message && e.message.includes("Room is full")) greekError = strings.menu.err_room_full;
+      
+      this.state = { view: "error", errorMsg: greekError };
       this.render();
     }
   }
@@ -100,53 +91,68 @@ export class GameMenu {
       switch (this.state.view) {
         case "home":
           return html`
-            <div style="display:flex; flex-direction:column; gap:20px; text-align:center;">
-              <h1>Passe Trappe</h1>
-              <button @click=${() => this.startPublic()} style="padding:15px; font-size:1.2em; cursor:pointer;">
-                Find Public Match
+            <div class="menu-card">
+              <img src="assets/poliorkia.png" class="menu-logo" alt="Poliorkia" />
+              
+              <button class="btn btn-primary" @click=${() => this.startPublic()}>
+                ${strings.menu.btn_find_match}
               </button>
-              <hr style="width:100%"/>
-              <button @click=${() => this.createPrivate()} style="padding:10px; font-size:1em; cursor:pointer;">
-                Create Private Room
+              
+              <div class="menu-divider"></div>
+              
+              <button class="btn btn-secondary" @click=${() => this.createPrivate()}>
+                ${strings.menu.btn_create_room}
               </button>
-              <div style="display:flex; gap:5px;">
-                <input id="roomInput" type="text" maxlength="6" placeholder="111111" style="padding:10px; font-size:1em; width:100px; text-align:center; letter-spacing: 2px;">
-                <button @click=${() => {
+              
+              <div class="input-group">
+                <input id="roomInput" class="code-input" type="text" maxlength="6" placeholder="${strings.menu.input_placeholder}" />
+                <button class="btn btn-secondary btn-inline" @click=${() => {
                     const val = (document.getElementById('roomInput') as HTMLInputElement).value;
                     this.joinPrivate(val);
-                }} style="padding:10px; cursor:pointer;">Join</button>
+                }}>${strings.menu.btn_enter}</button>
               </div>
             </div>
           `;
+
         case "hosting":
           return html`
-            <div style="text-align:center;">
-              <h2>Waiting for Player...</h2>
+            <div class="menu-card">
+              <h2 class="menu-subtitle">${strings.menu.status_waiting}</h2>
               ${this.state.roomId 
-                ? html`<div style="font-size:3em; letter-spacing:5px; font-weight:bold; margin:20px;">${this.state.roomId}</div>`
-                : html`<p>Generating Code...</p>`
+                ? html`<div class="code-display">${this.state.roomId}</div>`
+                : html`<div class="spinner"></div><p style="font-weight:bold; color: #aaa;">${strings.menu.status_creating}</p>`
               }
-              <p>Share this code with a friend.</p>
-              <button @click=${() => this.reset()}>Cancel</button>
+              <p style="color: var(--text-muted); font-size: 0.9em;">${strings.menu.msg_share_code}</p>
+              <div class="menu-divider"></div>
+              <button class="btn btn-ghost" @click=${() => this.reset()}>${strings.menu.btn_cancel}</button>
             </div>
           `;
+
         case "matchmaking":
           return html`
-            <div style="text-align:center;">
-              <h2>Looking for opponent...</h2>
+            <div class="menu-card">
+              <h2 class="menu-subtitle">${strings.menu.status_searching}</h2>
               <div class="spinner"></div> 
-              <p>Please wait...</p>
-              <button @click=${() => this.reset()}>Cancel</button>
+              <p style="font-weight:bold; color: var(--secondary-color);">${strings.menu.msg_looking}</p>
+              <div class="menu-divider"></div>
+              <button class="btn btn-ghost" @click=${() => this.reset()}>${strings.menu.btn_cancel}</button>
             </div>
           `;
+
         case "joining":
-          return html`<h2>Connecting to Room...</h2>`;
+          return html`
+            <div class="menu-card">
+               <div class="spinner"></div>
+               <h2 class="menu-subtitle">${strings.menu.status_connecting}</h2>
+            </div>
+          `;
+
         case "error":
           return html`
-            <div style="text-align:center; color: red;">
-              <h2>Error</h2>
-              <p>${this.state.errorMsg}</p>
-              <button @click=${() => this.reset()}>Back</button>
+            <div class="menu-card">
+              <h2 style="color: var(--danger-color);">${strings.menu.err_title}</h2>
+              <div class="error-msg">${this.state.errorMsg}</div>
+              <button class="btn btn-secondary" @click=${() => this.reset()}>${strings.menu.btn_back}</button>
             </div>
           `;
       }

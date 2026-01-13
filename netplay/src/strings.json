@@ -1,0 +1,29 @@
+{
+  "menu": {
+    "btn_find_match": "ΕΥΡΕΣΗ ΑΝΤΙΠΑΛΟΥ",
+    "btn_create_room": "ΔΗΜΙΟΥΡΓΙΑ ΔΩΜΑΤΙΟΥ",
+    "btn_enter": "ΕΙΣΟΔΟΣ",
+    "btn_cancel": "ΑΚΥΡΟ",
+    "btn_back": "ΠΙΣΩ",
+    "input_placeholder": "######",
+    "status_waiting": "Αναμονή Παίκτη...",
+    "status_creating": "ΔΗΜΙΟΥΡΓΙΑ...",
+    "status_searching": "Αναζήτηση...",
+    "status_connecting": "Σύνδεση...",
+    "msg_share_code": "Μοιράσου τον κωδικό με έναν φίλο!",
+    "msg_looking": "Ψάχνουμε αντίπαλο...",
+    "err_title": "Ωχ!",
+    "err_create_failed": "Δεν ήταν δυνατή η δημιουργία δωματίου.",
+    "err_invalid_code": "Ο κωδικός πρέπει να είναι 6 ψηφία.",
+    "err_connection_failed": "Αποτυχία σύνδεσης.",
+    "err_room_not_found": "Το δωμάτιο δεν βρέθηκε.",
+    "err_room_full": "Το δωμάτιο είναι γεμάτο."
+  },
+  "game": {
+    "opponent_away_title": "Ο ΑΝΤΙΠΑΛΟΣ ΕΙΝΑΙ ΕΚΤΟΣ",
+    "opponent_away_desc": "Ο άλλος παίκτης ελαχιστοποίησε το παράθυρο.",
+    "opponent_away_note": "Το παιχνίδι μπορεί να καθυστερεί μέχρι να επιστρέψει.",
+    "webrtc_stats_title": "WebRTC Stats"
+  }
+}
+
