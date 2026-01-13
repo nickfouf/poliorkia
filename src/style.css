@@ -79,7 +79,6 @@ html, body {
   text-shadow: 2px 2px 0px #74b9ff;
 }
 
-/* Updated logo class */
 .menu-logo {
     width: 100%;
     height: auto;
@@ -104,7 +103,7 @@ html, body {
   width: calc(100% - 2 * 3rem);
 }
 
-/* --- Bouncy Buttons (Fixed Layout Shift) --- */
+/* --- Bouncy Buttons --- */
 .btn {
     display: block;
     width: calc(100% - 2 * 3rem);
@@ -125,13 +124,10 @@ html, body {
 }
 
 .btn:active {
-  /* Move down visually */
   top: 4px;
-  /* Reduce shadow to simulate press */
   box-shadow: 0 2px 0 var(--btn-shadow-color) !important;
 }
 
-/* Colors defined with shadow variables */
 .btn-primary {
   background-color: var(--primary-color);
   color: white;
@@ -206,7 +202,7 @@ html, body {
   border: 3px dashed #dfe6e9;
 }
 
-/* --- Status & Loading --- */
+/* --- Status & Loading Spinner --- */
 .spinner {
   width: 50px;
   height: 50px;
@@ -240,3 +236,75 @@ html, body {
 .hidden {
   display: none !important;
 }
+
+/* ========================================= */
+/*       PROFESSIONAL ASSET LOADER UI        */
+/* ========================================= */
+
+#app-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #1e272e 0%, #485460 100%);
+    z-index: 10000; /* Must cover everything */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Nunito', sans-serif;
+    transition: opacity 0.6s ease-out;
+}
+
+.loader-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+    width: 320px;
+    text-align: center;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+}
+
+.loader-logo {
+    width: 120px;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+.loader-status {
+    font-weight: 800;
+    color: #2d3436;
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.loader-details {
+    font-size: 0.85rem;
+    color: #636e72;
+    margin-bottom: 20px;
+    font-family: monospace;
+}
+
+.progress-track {
+    background-color: #dfe6e9;
+    border-radius: 10px;
+    height: 12px;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #b2bec3;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #0984e3, #74b9ff);
+    height: 100%;
+    width: 0%;
+    border-radius: 8px;
+    transition: width 0.1s linear;
+}
+

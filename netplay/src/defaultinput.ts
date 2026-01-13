@@ -151,9 +151,34 @@ export class DefaultInputReader {
       false
     );
 
-    canvas.addEventListener("touchstart", (e) => this.updateTouches(e), false);
-    canvas.addEventListener("touchmove", (e) => this.updateTouches(e), false);
-    canvas.addEventListener("touchend", (e) => this.updateTouches(e), false);
+    // --- FIX: Prevent "Ghost Mouse" events on touch devices ---
+    // We add e.preventDefault() to ensure the browser doesn't fire
+    // a delayed 'mousedown' after 'touchstart'.
+    canvas.addEventListener(
+      "touchstart",
+      (e) => {
+        e.preventDefault();
+        this.updateTouches(e);
+      },
+      { passive: false }
+    );
+    canvas.addEventListener(
+      "touchmove",
+      (e) => {
+        e.preventDefault();
+        this.updateTouches(e);
+      },
+      { passive: false }
+    );
+    canvas.addEventListener(
+      "touchend",
+      (e) => {
+        e.preventDefault();
+        this.updateTouches(e);
+      },
+      { passive: false }
+    );
+    // ----------------------------------------------------------
 
     // --- UPDATED: Track Mouse Buttons ---
     // We listen for mousedown on the canvas (start click)
@@ -284,8 +309,3 @@ export class DefaultInputReader {
     return input;
   }
 }
-
-
-
-
-

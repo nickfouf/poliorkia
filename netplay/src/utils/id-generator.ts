@@ -22,10 +22,8 @@ export class IdGenerator {
 
         // 3. Add offset to shift range from 0..888888 to 111111..999999
         let id = x + this.OFFSET;
-alert(3)
+
         return id.toString();
     }
 }
-
-
 

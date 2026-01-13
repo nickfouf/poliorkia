@@ -1,6 +1,7 @@
 {
   "menu": {
     "btn_find_match": "ΕΥΡΕΣΗ ΑΝΤΙΠΑΛΟΥ",
+    "btn_vs_ai": "ΑΝΤΙΜΕΤΩΠΙΣΕ ΤΟ AI",
     "btn_create_room": "ΔΗΜΙΟΥΡΓΙΑ ΔΩΜΑΤΙΟΥ",
     "btn_enter": "ΕΙΣΟΔΟΣ",
     "btn_cancel": "ΑΚΥΡΟ",
@@ -24,6 +25,12 @@
     "opponent_away_desc": "Ο άλλος παίκτης ελαχιστοποίησε το παράθυρο.",
     "opponent_away_note": "Το παιχνίδι μπορεί να καθυστερεί μέχρι να επιστρέψει.",
     "webrtc_stats_title": "WebRTC Stats"
+  },
+  "countdown": {
+    "step_3": "3",
+    "step_2": "2",
+    "step_1": "1",
+    "go": "Φύγαμε!"
   }
 }
 

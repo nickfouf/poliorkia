@@ -48,7 +48,7 @@ registerCustomType(Set, "Set", (set: Set<any>) => {
   for (let value of data) {
     result.add(deserialize(value));
   }
-  console.log(result);
+  // --- FIX: Removed console.log that caused lag in Mixed Input modes ---
   return result;
 });
 
@@ -125,7 +125,3 @@ export function deserialize(data: JsonValue): any {
     throw new Error("Failed to deserialize unknown type.");
   }
 }
-
-
-
-

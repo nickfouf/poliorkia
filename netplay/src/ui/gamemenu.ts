@@ -7,9 +7,10 @@ export class GameMenu {
   root: HTMLDivElement;
   matchmaker: FirebaseMatchmaker;
 
-  // Events for the GameWrapper to start the game
+  // Events
   onClientStart: TypedEvent<FirebasePeerConnection> = new TypedEvent();
   onHostStart: TypedEvent<FirebasePeerConnection> = new TypedEvent();
+  onAIStart: TypedEvent<void> = new TypedEvent(); // <--- NEW
 
   state: {
     view: "home" | "hosting" | "joining" | "matchmaking" | "error";
@@ -24,9 +25,8 @@ export class GameMenu {
 
     this.matchmaker = new FirebaseMatchmaker();
 
-    // Listen globally for match success
     this.matchmaker.onMatchFound.on((data) => {
-      this.root.style.display = "none"; // Hide menu
+      this.root.style.display = "none";
       if (data.isHost) {
         this.onHostStart.emit(data.connection);
       } else {
@@ -79,6 +79,12 @@ export class GameMenu {
     this.render();
     this.matchmaker.startPublicMatchmaking();
   }
+  
+  // Trigger AI start
+  startAI() {
+      this.root.style.display = "none";
+      this.onAIStart.emit();
+  }
 
   reset() {
       this.matchmaker.stopPublicMatchmaking();
@@ -98,9 +104,14 @@ export class GameMenu {
                 ${strings.menu.btn_find_match}
               </button>
               
+              <!-- AI BUTTON -->
+              <button class="btn btn-secondary" style="background-color: #a55eea; --btn-shadow-color: #8854d0; box-shadow: 0 6px 0 var(--btn-shadow-color);" @click=${() => this.startAI()}>
+                ${strings.menu.btn_vs_ai}
+              </button>
+              
               <div class="menu-divider"></div>
               
-              <button class="btn btn-secondary" @click=${() => this.createPrivate()}>
+              <button class="btn btn-ghost" @click=${() => this.createPrivate()}>
                 ${strings.menu.btn_create_room}
               </button>
               
@@ -161,4 +172,3 @@ export class GameMenu {
     render(content(), this.root);
   }
 }
-
