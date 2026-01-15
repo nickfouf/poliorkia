@@ -31,7 +31,8 @@ export class AssetManager {
     public async preloadAll(onProgress: (loaded: number, total: number) => void): Promise<void> {
         // 1. Fetch Manifest
         try {
-            const response = await fetch('/assets-manifest.json');
+            // --- CHANGE: Remove leading slash for relative fetching ---
+            const response = await fetch('assets-manifest.json');
             if (response.ok) {
                 const data = await response.json();
                 this.manifest = data.files;
@@ -176,4 +177,6 @@ export class AssetManager {
         return tex;
     }
 }
+
+
 

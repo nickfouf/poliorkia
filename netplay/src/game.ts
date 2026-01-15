@@ -60,3 +60,5 @@ export abstract class Game extends NetplayState<DefaultInput> {
   resize(width: number, height: number): void {}
 }
 
+
+

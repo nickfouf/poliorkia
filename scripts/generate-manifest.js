@@ -9,7 +9,9 @@ const __dirname = path.dirname(__filename);
 // Configuration
 const PUBLIC_DIR = path.join(__dirname, '../public');
 const ASSETS_DIR = path.join(PUBLIC_DIR, 'assets');
-const OUTPUT_FILE = path.join(__dirname, '../assets-manifest.json');
+
+// --- CHANGE: Output inside 'public' so Vite copies it to 'dist' ---
+const OUTPUT_FILE = path.join(PUBLIC_DIR, 'assets-manifest.json');
 
 function getAllFiles(dirPath, arrayOfFiles = {}) {
     let files;
@@ -59,3 +61,6 @@ try {
 } catch (err) {
     console.error("Error generating manifest:", err);
 }
+
+
+

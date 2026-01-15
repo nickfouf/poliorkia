@@ -84,10 +84,19 @@ export class LocalWrapper {
 
   start() {
     let lastTimestamp = performance.now();
+    let accumulator = 0;
+
     let animate = (timestamp) => {
-      if (timestamp >= lastTimestamp + this.gameClass.timestep) {
-        // Reset the timestamp.
-        lastTimestamp = timestamp;
+      let dtMs = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      // Safety clamp
+      if (dtMs > 250) dtMs = 250;
+
+      accumulator += dtMs;
+
+      while (accumulator >= this.gameClass.timestep) {
+        accumulator -= this.gameClass.timestep;
 
         // Query each of our input readers.
         let instanceInputs = this.instances.map((inst) =>
@@ -102,10 +111,12 @@ export class LocalWrapper {
 
           // Tick game state forward.
           instance.game.tick(inputs);
-
-          // Draw state to canvas.
-          instance.game.draw(instance.canvas);
         }
+      }
+
+      // Draw state to canvas (every frame)
+      for (let instance of this.instances) {
+          instance.game.draw(instance.canvas);
       }
 
       requestAnimationFrame(animate);
@@ -113,6 +124,10 @@ export class LocalWrapper {
     requestAnimationFrame(animate);
   }
 }
+
+
+
+
 
 
 

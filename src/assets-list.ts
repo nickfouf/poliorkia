@@ -4,6 +4,10 @@ export const REQUIRED_ASSETS = [
     "assets/table.glb",
     "assets/wood.glb",
     "assets/poliorkia_wood.png",
-    "assets/poliorkia.png"
+    "assets/poliorkia.png",
+    "assets/timer_box.png",
+    "assets/foul_box.png"
 ];
+
+
 

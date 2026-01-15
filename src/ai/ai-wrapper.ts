@@ -2,34 +2,63 @@ import { DefaultInput, GameWrapper, NetplayPlayer, GameClass, FirebasePeerConnec
 import { AIController } from "./ai-controller";
 import { PasseTrappeGame } from "../game";
 import { html, render } from "lit-html";
+import strings from "/netplay/src/strings.json";
+// FIXED PATH: src/teams.json
+import rawTeamsList from "../teams.json";
+
+// NEW: Create sorted reference for consistency with GameMenu UI
+const sortedTeamsList = [...rawTeamsList].sort((a, b) => a.name.localeCompare(b.name));
 
 export class AIWrapper extends GameWrapper {
     game?: PasseTrappeGame;
     aiController?: AIController;
     
-    // Fix: Store players here since Game instance doesn't expose them
     players: Array<NetplayPlayer> = [];
 
     constructor(gameClass: GameClass) {
         super(gameClass);
     }
 
-    // Required abstract methods (unused in AI mode)
     startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {}
     startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {}
 
-    // Custom start method for AI
-    startAI() {
+    startAI(difficultyPercentage: number) {
         this.canvas.style.display = "block";
         
-        // Define Players: P0 (Human), P1 (AI)
+        // Fetch local name
+        const localName = localStorage.getItem("poliorkia_username") || strings.game.default_player_name;
+        // Fetch local team index
+        const teamIdxStr = localStorage.getItem("poliorkia_team_index");
+        
+        let localTeam = null;
+        if (teamIdxStr) {
+            const index = parseInt(teamIdxStr, 10);
+            // Handle offset: 0 = None, >0 = team[index-1]
+            if (index > 0) {
+                const realIndex = index - 1;
+                // Use sorted list to retrieve correct team
+                if (realIndex >= 0 && realIndex < sortedTeamsList.length) {
+                    localTeam = sortedTeamsList[realIndex];
+                }
+            }
+        }
+
         this.players = [
             new NetplayPlayer(0, true, true),  
             new NetplayPlayer(1, true, false)  
         ];
 
         this.game = new this.gameClass(this.canvas, this.players) as PasseTrappeGame;
-        this.aiController = new AIController(this.game);
+        
+        // Set Profiles (P0 = Local, P1 = CPU)
+        // Updated: Manually set CPU team to MINIMA AI
+        this.game.setPlayerProfiles(
+            { name: localName, team: localTeam },
+            { name: strings.game.cpu_name, team: { name: "MINIMA AI", icon: "bot_icon.png" } }
+        );
+
+        const difficultyRatio = difficultyPercentage / 100.0;
+        this.aiController = new AIController(this.game, difficultyRatio);
 
         this.startGameLoop();
         this.resize();
@@ -39,39 +68,51 @@ export class AIWrapper extends GameWrapper {
         this.stats.style.display = "block";
         
         let lastTimestamp = performance.now();
+        let accumulator = 0;
 
         const animate = (timestamp) => {
-            const dtMs = timestamp - lastTimestamp;
+            let dtMs = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            // Safety clamp: prevent spiral of death if tab was backgrounded for too long
+            if (dtMs > 250) dtMs = 250;
+
+            accumulator += dtMs;
             
-            if (dtMs >= this.gameClass.timestep) {
-                lastTimestamp = timestamp;
+            // Consume accumulator in fixed timesteps
+            while (accumulator >= this.gameClass.timestep) {
+                accumulator -= this.gameClass.timestep;
 
-                // 1. Get Human Input
                 const humanInput = this.inputReader.getInput();
+                // --- FIX: ENRICH INPUT LOCALLY FOR HUMAN ---
+                this.game!.enrichInput(humanInput);
 
-                // 2. Generate AI Input (dt in seconds)
-                const aiInput = this.aiController!.generateInput(dtMs / 1000);
+                // Pass the FIXED timestep to the AI controller, not the variable render delta
+                const fixedDtSec = this.gameClass.timestep / 1000;
+                const aiInput = this.aiController!.generateInput(fixedDtSec);
 
-                // 3. Map inputs using the local 'this.players' array
                 const inputs = new Map<NetplayPlayer, DefaultInput>();
                 inputs.set(this.players[0], humanInput);
                 inputs.set(this.players[1], aiInput);
 
-                // 4. Tick Game
                 this.game!.tick(inputs);
-
-                // 5. Draw
-                this.game!.draw();
-                
-                // 6. Update Label
-                const statsHTML = html`
-                    <div style="font-weight: bold; color: #a55eea; font-family: 'Nunito', sans-serif;">MODE: VS AI</div>
-                `;
-                render(statsHTML, this.stats);
             }
+            
+            // Draw every frame (interpolation could be added here if needed)
+            this.game!.draw();
+            
+            const statsHTML = html`
+                <div style="font-weight: bold; color: #a55eea; font-family: 'Nunito', sans-serif;">MODE: VS AI</div>
+            `;
+            render(statsHTML, this.stats);
 
-            requestAnimationFrame(animate);
+            // SAVE ID
+            this.animationFrameId = requestAnimationFrame(animate);
         };
-        requestAnimationFrame(animate);
+        // SAVE ID
+        this.animationFrameId = requestAnimationFrame(animate);
     }
 }
+
+
+

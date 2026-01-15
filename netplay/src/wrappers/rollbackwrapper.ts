@@ -1,4 +1,4 @@
-import { DefaultInput, DefaultInputReader } from "../defaultinput";
+import { DefaultInput } from "../defaultinput";
 import { NetplayPlayer } from "../netcode/types";
 import * as log from "loglevel";
 import { GameWrapper } from "./gamewrapper";
@@ -7,29 +7,59 @@ import { RollbackNetcode } from "../netcode/rollback";
 import { assert } from "chai";
 import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 import * as lit from "lit-html";
+import { GameVisualConfig } from "../../../src/types";
 
 export class RollbackWrapper extends GameWrapper {
   game?: Game;
   rollbackNetcode?: RollbackNetcode<Game, DefaultInput>;
 
   constructor(gameClass: GameClass) { super(gameClass); }
+  
+  destroy() {
+    if (this.rollbackNetcode) {
+        this.rollbackNetcode.stop();
+        this.rollbackNetcode = undefined;
+    }
+    super.destroy();
+  }
+
   getInitialInputs(players: Array<NetplayPlayer>): Map<NetplayPlayer, DefaultInput> {
     let initialInputs: Map<NetplayPlayer, DefaultInput> = new Map();
     for (let player of players) { initialInputs.set(player, new DefaultInput()); }
     return initialInputs;
   }
 
-  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
+  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string, visuals?: GameVisualConfig) {
     assert(conn.dataChannel?.readyState === "open", "DataChannel must be open.");
     log.info("Starting a rollback host.");
+    
+    this.opponentName = opponentName;
+    this.gameVisuals = visuals;
+    
     this.game = new this.gameClass(this.canvas, players);
+    
+    const g = this.game as any;
+    if (typeof g.setGameDuration === 'function') {
+        g.setGameDuration(this.gameDuration);
+    }
+    
+    this.pushProfilesToGame(this.game, true);
+
     this.rollbackNetcode = new RollbackNetcode(
       true, this.game!, players, this.getInitialInputs(players), 10, this.pingMeasure, this.gameClass.timestep,
-      () => this.inputReader.getInput(),
+      () => {
+          const input = this.inputReader.getInput();
+          if (this.game && typeof (this.game as any).enrichInput === 'function') {
+             (this.game as any).enrichInput(input);
+          }
+          return input;
+      },
       (frame, input) => { conn.send({ type: "input", frame: frame, input: input.serialize() }); },
       (frame, state) => { conn.send({ type: "state", frame: frame, state: state }); }
     );
     conn.on("data", (data) => {
+      this.handleProfileData(data, this.game, true);
+
       if (data.type === "input") {
         let input = new DefaultInput();
         input.deserialize(data.input);
@@ -40,16 +70,36 @@ export class RollbackWrapper extends GameWrapper {
     this.startGameLoop();
   }
 
-  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
+  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string, visuals?: GameVisualConfig) {
     assert(conn.dataChannel?.readyState === "open", "DataChannel must be open.");
     log.info("Starting a rollback client.");
+    
+    this.opponentName = opponentName;
+    this.gameVisuals = visuals;
+
     this.game = new this.gameClass(this.canvas, players);
+    
+    const g = this.game as any;
+    if (typeof g.setGameDuration === 'function') {
+        g.setGameDuration(this.gameDuration);
+    }
+
+    this.pushProfilesToGame(this.game, false);
+
     this.rollbackNetcode = new RollbackNetcode(
       false, this.game!, players, this.getInitialInputs(players), 10, this.pingMeasure, this.gameClass.timestep,
-      () => this.inputReader.getInput(),
+      () => {
+          const input = this.inputReader.getInput();
+          if (this.game && typeof (this.game as any).enrichInput === 'function') {
+             (this.game as any).enrichInput(input);
+          }
+          return input;
+      },
       (frame, input) => { conn.send({ type: "input", frame: frame, input: input.serialize() }); }
     );
     conn.on("data", (data) => {
+      this.handleProfileData(data, this.game, false);
+
       if (data.type === "input") {
         let input = new DefaultInput();
         input.deserialize(data.input);
@@ -63,20 +113,16 @@ export class RollbackWrapper extends GameWrapper {
   }
 
   startGameLoop() {
-    // --- FORCE HIDE STATS ---
     this.stats.style.display = "none";
 
     this.rollbackNetcode!.start();
     let animate = (timestamp) => {
       this.game!.draw(this.canvas);
-      // Stats updated but invisible
       const statsHTML = lit.html`<div>Ping: ${this.pingMeasure.average().toFixed(2)} ms</div>`;
       lit.render(statsHTML, this.stats);
-      requestAnimationFrame(animate);
+      this.animationFrameId = requestAnimationFrame(animate);
     };
-    requestAnimationFrame(animate);
+    this.animationFrameId = requestAnimationFrame(animate);
   }
 }
-
-
 

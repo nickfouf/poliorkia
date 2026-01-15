@@ -377,17 +377,22 @@ export class RollbackNetcode<
     return stateInputs;
   }
 
+  // STORE THE INTERVAL ID
+  private intervalId: any;
+
   start() {
-    setInterval(() => {
-      // TODO: This is way to aggressive of a speed up.
+    this.intervalId = setInterval(() => {
       // If us and our peer are running at the same simulation clock,
       // we should expect inputs from our peer to arrive after we have
       // simulated that state. If inputs from our peer are arriving before
       // we simulate the state, that means we are running slow, and we
-      // have to tick faster. Otherwise we are needlessly forcing our
-      // peer to predict lots of frames.
+      // have to tick faster.
+      
       let numTicks = 1;
-      if (this.largestFutureSize() > 0) {
+      
+      // FIX: Changed threshold from > 0 to > 3. 
+      // This prevents the game from running at 2x speed just because of small network jitter.
+      if (this.largestFutureSize() > 3) {
         numTicks = 2;
       }
 
@@ -396,7 +401,19 @@ export class RollbackNetcode<
       }
     }, this.timestep);
   }
+
+  // ADD STOP METHOD
+  stop() {
+    if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = undefined;
+    }
+  }
 }
+
+
+
+
 
 
 

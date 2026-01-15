@@ -4,13 +4,8 @@ import { TouchControl } from "./touchcontrols";
 import { Vec2 } from "./vec2";
 
 type GamepadButton = {
-  /** Was this Gamepad button pressed on this frame? */
   pressed: boolean;
-
-  /** Was this Gamepad button released on this frame? */
   released: boolean;
-
-  /** Is this Gamepad button currently held down? */
   held: boolean;
 };
 
@@ -19,11 +14,14 @@ export class DefaultInput extends NetplayInput {
   keysHeld: { [key: string]: boolean } = {};
   keysReleased: { [key: string]: boolean } = {};
 
-  // --- NEW: Track held mouse buttons (0 = Left, 1 = Middle, 2 = Right) ---
+  // --- NEW: World Coordinates (The Fix) ---
+  // We send the projected world position directly to ensure
+  // 100% determinism regardless of screen aspect ratio.
+  targetX?: number;
+  targetY?: number;
+
   mouseButtons: Set<number> = new Set();
-
   mousePosition?: { x: number; y: number };
-
   touches: Array<{ x: number; y: number }> = [];
 
   gamepads: Array<{
@@ -33,7 +31,6 @@ export class DefaultInput extends NetplayInput {
 
   touchControls?: { [name: string]: any };
 
-  /** Helper function to return arrow keys as a Vec2. */
   arrowKeys(): Vec2 {
     return new Vec2(
       (this.keysHeld.ArrowLeft ? -1 : 0) + (this.keysHeld.ArrowRight ? 1 : 0),
@@ -41,7 +38,6 @@ export class DefaultInput extends NetplayInput {
     );
   }
 
-  /** Helper function to return WASD keys as a Vec2. */
   wasd(): Vec2 {
     return new Vec2(
       (this.keysHeld.a ? -1 : 0) + (this.keysHeld.d ? 1 : 0),
@@ -58,43 +54,41 @@ export class DefaultInputReader {
   keysHeld: { [key: string]: boolean } = {};
   keysReleased: { [key: string]: boolean } = {};
 
-  // --- NEW: Track local mouse button state ---
   mouseButtonsHeld: Set<number> = new Set();
 
   mousePosition: { x: number; y: number } | null = null;
-  mouseDelta: { x: number; y: number } | null = null;
   touches: Array<{ x: number; y: number }> = [];
+  
+  lastTouchTime: number = 0;
 
   touchControls: { [name: string]: TouchControl };
 
-  /**
-   * We need to track the previous state of GamePads
-   * so that we can determine the frame that the button
-   * was pressed or released.
-   */
-  previousGamepadState: Map<
-    number,
-    {
-      /** Whether or not the button was held on the previous frame. */
-      buttons: Array<boolean>;
-    }
-  > = new Map();
+  previousGamepadState: Map<number, { buttons: Array<boolean> }> = new Map();
+
+  private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundKeyUp: (e: KeyboardEvent) => void;
+  private boundMouseEnter: (e: MouseEvent) => void;
+  private boundMouseMove: (e: MouseEvent) => void;
+  private boundMouseLeave: (e: MouseEvent) => void;
+  private boundMouseDown: (e: MouseEvent) => void;
+  private boundMouseUp: (e: MouseEvent) => void;
+  private boundContextMenu: (e: MouseEvent) => void;
+  private boundTouchStart: (e: TouchEvent) => void;
+  private boundTouchMove: (e: TouchEvent) => void;
+  private boundTouchEnd: (e: TouchEvent) => void;
 
   getCanvasScale(): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { x: 1, y: 1 };
     return {
       x: this.canvasSize.width / rect.width,
       y: this.canvasSize.height / rect.height,
     };
   }
 
-  projectClientPosition(
-    clientX: number,
-    clientY: number
-  ): { x: number; y: number } {
+  projectClientPosition(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const scale = this.getCanvasScale();
-
     return {
       x: (clientX - rect.left) * scale.x,
       y: (clientY - rect.top) * scale.y,
@@ -113,123 +107,103 @@ export class DefaultInputReader {
     this.canvasSize = canvasSize;
     this.touchControls = touchControls;
 
-    root.addEventListener(
-      "keydown",
-      (event) => {
+    this.boundKeyDown = (event) => {
         if (event.repeat) return;
         this.keysHeld[event.key] = true;
         this.keysPressed[event.key] = true;
-      },
-      false
-    );
-    root.addEventListener(
-      "keyup",
-      (event) => {
+    };
+    this.boundKeyUp = (event) => {
         this.keysHeld[event.key] = false;
         this.keysReleased[event.key] = true;
-      },
-      false
-    );
+    };
 
-    canvas.addEventListener(
-      "mouseenter",
-      (e) => this.updateMousePosition(e),
-      false
-    );
-
-    canvas.addEventListener(
-      "mousemove",
-      (e) => this.updateMousePosition(e),
-      false
-    );
-
-    canvas.addEventListener(
-      "mouseleave",
-      (e) => {
-        this.mousePosition = null;
-      },
-      false
-    );
-
-    // --- FIX: Prevent "Ghost Mouse" events on touch devices ---
-    // We add e.preventDefault() to ensure the browser doesn't fire
-    // a delayed 'mousedown' after 'touchstart'.
-    canvas.addEventListener(
-      "touchstart",
-      (e) => {
-        e.preventDefault();
-        this.updateTouches(e);
-      },
-      { passive: false }
-    );
-    canvas.addEventListener(
-      "touchmove",
-      (e) => {
-        e.preventDefault();
-        this.updateTouches(e);
-      },
-      { passive: false }
-    );
-    canvas.addEventListener(
-      "touchend",
-      (e) => {
-        e.preventDefault();
-        this.updateTouches(e);
-      },
-      { passive: false }
-    );
-    // ----------------------------------------------------------
-
-    // --- UPDATED: Track Mouse Buttons ---
-    // We listen for mousedown on the canvas (start click)
-    canvas.addEventListener("mousedown", (event) => {
+    this.boundMouseEnter = (e) => this.updateMousePosition(e);
+    
+    this.boundMouseMove = (e) => {
+      // Ignore mouse if touch is active
+      if (Date.now() - this.lastTouchTime < 1000) return; 
+      this.updateMousePosition(e);
+    };
+    
+    this.boundMouseLeave = (e) => { this.mousePosition = null; };
+    
+    this.boundMouseDown = (event) => {
+      if (Date.now() - this.lastTouchTime < 1000) return;
       this.mouseButtonsHeld.add(event.button);
-      if (pointerLock) {
-        canvas.requestPointerLock();
-      }
-    });
-
-    // We listen for mouseup on the window (end click anywhere)
-    // This handles dragging the mouse outside the canvas and releasing it.
-    window.addEventListener("mouseup", (event) => {
+      if (pointerLock) canvas.requestPointerLock();
+    };
+    
+    this.boundMouseUp = (event) => {
       this.mouseButtonsHeld.delete(event.button);
-    });
-
-    canvas.addEventListener("contextmenu", (e) => {
+    };
+    this.boundContextMenu = (e) => {
       if (preventContextMenu) e.preventDefault();
-    });
+    };
+
+    const handleTouch = (e: TouchEvent) => {
+        this.lastTouchTime = Date.now();
+        if (e.cancelable) e.preventDefault();
+        this.updateTouches(e);
+    };
+
+    this.boundTouchStart = handleTouch;
+    this.boundTouchMove = handleTouch;
+    this.boundTouchEnd = handleTouch;
+
+    root.addEventListener("keydown", this.boundKeyDown, false);
+    root.addEventListener("keyup", this.boundKeyUp, false);
+
+    canvas.addEventListener("mouseenter", this.boundMouseEnter, false);
+    canvas.addEventListener("mousemove", this.boundMouseMove, false);
+    canvas.addEventListener("mouseleave", this.boundMouseLeave, false);
+    canvas.addEventListener("mousedown", this.boundMouseDown);
+    window.addEventListener("mouseup", this.boundMouseUp);
+    canvas.addEventListener("contextmenu", this.boundContextMenu);
+
+    canvas.addEventListener("touchstart", this.boundTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", this.boundTouchMove, { passive: false });
+    canvas.addEventListener("touchend", this.boundTouchEnd, { passive: false });
+  }
+
+  destroy() {
+    const root = document.body; 
+    root.removeEventListener("keydown", this.boundKeyDown, false);
+    root.removeEventListener("keyup", this.boundKeyUp, false);
+
+    this.canvas.removeEventListener("mouseenter", this.boundMouseEnter, false);
+    this.canvas.removeEventListener("mousemove", this.boundMouseMove, false);
+    this.canvas.removeEventListener("mouseleave", this.boundMouseLeave, false);
+    this.canvas.removeEventListener("mousedown", this.boundMouseDown);
+    window.removeEventListener("mouseup", this.boundMouseUp);
+    this.canvas.removeEventListener("contextmenu", this.boundContextMenu);
+
+    this.canvas.removeEventListener("touchstart", this.boundTouchStart);
+    this.canvas.removeEventListener("touchmove", this.boundTouchMove);
+    this.canvas.removeEventListener("touchend", this.boundTouchEnd);
   }
 
   updateMousePosition(event: MouseEvent) {
     if (document.pointerLockElement === this.canvas) {
       if (!this.mousePosition) {
-        // If we are pointer locked, the first position is projected onto the canvas.
-        this.mousePosition = this.projectClientPosition(
-          event.clientX,
-          event.clientY
-        );
+        this.mousePosition = this.projectClientPosition(event.clientX, event.clientY);
       } else {
-        // Subsequent positions are delta based off of our relative movement.
         const scale = this.getCanvasScale();
         this.mousePosition.x += event.movementX * scale.x;
         this.mousePosition.y += event.movementY * scale.y;
       }
     } else {
-      // If we aren't pointer locked, just project the position onto the canvas.
-      this.mousePosition = this.projectClientPosition(
-        event.clientX,
-        event.clientY
-      );
+      this.mousePosition = this.projectClientPosition(event.clientX, event.clientY);
     }
   }
 
   updateTouches(event: TouchEvent) {
     this.touches.length = event.targetTouches.length;
     for (let i = 0; i < event.targetTouches.length; ++i) {
-      this.touches[i] = this.projectClientPosition(
+      const projected = this.projectClientPosition(
         event.targetTouches[i].clientX,
         event.targetTouches[i].clientY
       );
+      this.touches[i] = projected;
     }
   }
 
@@ -239,10 +213,6 @@ export class DefaultInputReader {
     for (let key in this.keysPressed) {
       if (this.keysPressed[key]) {
         input.keysPressed[key] = true;
-
-        // A pressed key is also a held key.
-        // This helps with the edge case where a
-        // key is pressed and released between the frames.
         input.keysHeld[key] = true;
       }
     }
@@ -253,59 +223,32 @@ export class DefaultInputReader {
       if (this.keysReleased[key]) input.keysReleased[key] = true;
     }
 
-    if (this.mousePosition)
-      input.mousePosition = utils.clone(this.mousePosition);
+    const hasTouches = this.touches.length > 0;
+    const recentTouch = Date.now() - this.lastTouchTime < 1000;
+    
     input.touches = utils.clone(this.touches);
 
-    // --- NEW: Copy mouse buttons to input object ---
-    input.mouseButtons = new Set(this.mouseButtonsHeld);
+    if (hasTouches || recentTouch) {
+        input.mousePosition = undefined;
+        input.mouseButtons = new Set();
+        // Emulate Mouse Button 0 for touch to ensure compatibility
+        if (hasTouches) {
+            input.mouseButtons.add(0);
+        }
+    } else {
+        if (this.mousePosition)
+            input.mousePosition = utils.clone(this.mousePosition);
+        input.mouseButtons = new Set(this.mouseButtonsHeld);
+    }
 
     for (let [name, control] of Object.entries(this.touchControls)) {
       input.touchControls = input.touchControls || {};
       input.touchControls[name] = utils.clone(control.getValue());
     }
 
-    // Processing GamePad inputs.
-    if (navigator.getGamepads) {
-      navigator.getGamepads().forEach((gamepad, gi) => {
-        // Ignore null gamepads.
-        if (!gamepad) return null;
-
-        // Get the previous state of this GamePad so that we can determine
-        // pressed and released states.
-        const previousState = this.previousGamepadState.get(gi) || {
-          buttons: gamepad.buttons.map(() => false),
-        };
-
-        const buttons: Array<GamepadButton> = gamepad.buttons.map(
-          (button, bi) => {
-            const held = button.pressed;
-            const pressed = !previousState.buttons[bi] && held;
-            const released = previousState.buttons[bi] && !held;
-            return {
-              held,
-              pressed,
-              released,
-            };
-          }
-        );
-
-        input.gamepads.push({
-          axes: utils.clone(gamepad.axes),
-          buttons: buttons,
-        });
-
-        // Update the previous state of this GamePad.
-        this.previousGamepadState.set(gi, {
-          buttons: gamepad.buttons.map((button) => button.pressed),
-        });
-      });
-    }
-
-    // Clear the pressed and released keys.
-    this.keysPressed = {};
-    this.keysReleased = {};
-
     return input;
   }
 }
+
+
+

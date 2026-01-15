@@ -135,6 +135,8 @@ export class LockstepNetcode<
     this.processLocalInput();
   }
 
+  private intervalId: any;
+
   start() {
     // Perform the first state sync.
     this.tryStateSync();
@@ -142,10 +144,17 @@ export class LockstepNetcode<
     // Process and broadcast the first input.
     this.processLocalInput();
 
-    setInterval(() => {
+    this.intervalId = setInterval(() => {
       // Each timestep, try to advance the state.
       this.tryAdvanceState();
     }, this.timestep);
+  }
+
+  stop() {
+    if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = undefined;
+    }
   }
 
   stateSyncsReceived: number = 0;
@@ -200,6 +209,10 @@ export class LockstepNetcode<
     queue.push({ frame: frame, input: input });
   }
 }
+
+
+
+
 
 
 

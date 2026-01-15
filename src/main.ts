@@ -1,15 +1,15 @@
-import { RollbackWrapper } from "netplayjs";
+import { RollbackWrapper, NetplayPlayer } from "netplayjs"; 
 import { AIWrapper } from "./ai/ai-wrapper";
 import { PasseTrappeGame } from "./game";
 import { AssetManager } from "./asset-manager";
 import { GameMenu } from "../netplay/src/ui/gamemenu";
+import strings from "../netplay/src/strings.json";
 
 const loaderHTML = `
 <div id="app-loader">
     <div class="loader-card">
-        <img src="assets/poliorkia.png" class="loader-logo" alt="Logo" />
-        <div class="loader-status">Loading Assets</div>
-        <div class="loader-details" id="loader-bytes">Initializing...</div>
+        <div class="loader-status">${strings.loader.status_loading}</div>
+        <div class="loader-details" id="loader-bytes">${strings.loader.status_init}</div>
         <div class="progress-track">
             <div class="progress-fill" id="loader-bar"></div>
         </div>
@@ -22,6 +22,71 @@ const loaderEl = document.getElementById('app-loader')!;
 const barEl = document.getElementById('loader-bar')!;
 const bytesEl = document.getElementById('loader-bytes')!;
 
+function initializeGameFlow() {
+    const menu = new GameMenu();
+
+    menu.onAIStart.once((difficulty) => {
+        PasseTrappeGame.useFastAnimations = true;
+        const wrapper = new AIWrapper(PasseTrappeGame);
+        
+        wrapper.onReturnToMenu = () => {
+             initializeGameFlow(); 
+        };
+
+        wrapper.startAI(difficulty);
+    });
+
+    menu.onHostStart.once((data) => {
+        console.log("[DEBUG] Main.ts: Host Start Event", data);
+        PasseTrappeGame.useFastAnimations = false;
+        const wrapper = new RollbackWrapper(PasseTrappeGame);
+        wrapper.localPlayerName = menu.userName;
+        wrapper.localTeamIndex = menu.userTeamIndex;
+        
+        wrapper.opponentName = data.opponentName;
+        wrapper.opponentTeamIndex = data.opponentTeamIndex;
+        wrapper.gameDuration = data.duration;
+        
+        wrapper.canvas.style.display = "block";
+
+        const players = [new NetplayPlayer(0, true, true), new NetplayPlayer(1, false, false)];
+
+        wrapper.startVisibilityWatcher(data.conn);
+        
+        wrapper.onReturnToMenu = () => {
+             initializeGameFlow(); 
+        };
+
+        wrapper.startHost(players, data.conn, data.opponentName, data.visuals);
+        wrapper.resize();
+    });
+
+    menu.onClientStart.once((data) => {
+        console.log("[DEBUG] Main.ts: Client Start Event", data);
+        PasseTrappeGame.useFastAnimations = false;
+        const wrapper = new RollbackWrapper(PasseTrappeGame);
+        wrapper.localPlayerName = menu.userName;
+        wrapper.localTeamIndex = menu.userTeamIndex;
+
+        wrapper.opponentName = data.opponentName;
+        wrapper.opponentTeamIndex = data.opponentTeamIndex;
+        wrapper.gameDuration = data.duration;
+
+        wrapper.canvas.style.display = "block";
+
+        const players = [new NetplayPlayer(0, false, true), new NetplayPlayer(1, true, false)];
+
+        wrapper.startVisibilityWatcher(data.conn);
+
+        wrapper.onReturnToMenu = () => {
+             initializeGameFlow();
+        };
+
+        wrapper.startClient(players, data.conn, data.opponentName, data.visuals);
+        wrapper.resize();
+    });
+}
+
 AssetManager.getInstance().preloadAll((loaded, total) => {
     const pct = total > 0 ? (loaded / total) * 100 : 0;
     const mbLoaded = (loaded / (1024 * 1024)).toFixed(2);
@@ -31,7 +96,7 @@ AssetManager.getInstance().preloadAll((loaded, total) => {
     bytesEl.innerText = `${mbLoaded} MB / ${mbTotal} MB`;
 
 }).then(() => {
-    bytesEl.innerText = "Ready!";
+    bytesEl.innerText = strings.loader.status_ready;
     barEl.style.width = "100%";
     
     setTimeout(() => {
@@ -39,33 +104,13 @@ AssetManager.getInstance().preloadAll((loaded, total) => {
         setTimeout(() => {
             loaderEl.remove();
             
-            const menu = new GameMenu();
-
-            menu.onAIStart.once(() => {
-                // ENABLE FAST ANIMATIONS FOR AI
-                PasseTrappeGame.useFastAnimations = true;
-                new AIWrapper(PasseTrappeGame).startAI();
-            });
-
-            menu.onHostStart.once((conn) => {
-                // NORMAL SPEED FOR NETPLAY
-                PasseTrappeGame.useFastAnimations = false;
-                const wrapper = new RollbackWrapper(PasseTrappeGame);
-                wrapper.startHost([/*players managed inside*/] as any, conn);
-            });
-
-            menu.onClientStart.once((conn) => {
-                // NORMAL SPEED FOR NETPLAY
-                PasseTrappeGame.useFastAnimations = false;
-                const wrapper = new RollbackWrapper(PasseTrappeGame);
-                wrapper.startClient([/*players managed inside*/] as any, conn);
-            });
+            initializeGameFlow();
             
         }, 600); 
     }, 200); 
 
 }).catch((err) => {
-    bytesEl.innerText = "Error Loading Assets";
+    bytesEl.innerText = strings.loader.status_error;
     bytesEl.style.color = "#d63031";
     console.error("Asset Loading Failed:", err);
 });

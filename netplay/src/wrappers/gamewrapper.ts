@@ -2,8 +2,7 @@ import { DefaultInputReader } from "../defaultinput";
 import { NetplayPlayer } from "../netcode/types";
 
 import * as log from "loglevel";
-import { GameClass } from "../game";
-
+import { Game, GameClass } from "../game";
 import { assert } from "chai";
 
 import * as utils from "../utils";
@@ -13,7 +12,10 @@ import EWMASD from "../ewmasd";
 
 import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 import strings from "../strings.json";
+import rawTeamsList from "../../../src/teams.json";
+import { GameVisualConfig } from "../../../src/types";
 
+const sortedTeamsList = [...rawTeamsList].sort((a, b) => a.name.localeCompare(b.name));
 const PING_INTERVAL = 100;
 
 export abstract class GameWrapper {
@@ -22,6 +24,20 @@ export abstract class GameWrapper {
   stats: HTMLDivElement;
   inputReader: DefaultInputReader;
   playerPausedIndicator: HTMLDivElement;
+  
+  localPlayerName: string = strings.game.default_player_name;
+  localTeamIndex: number = 0; 
+  
+  opponentName: string = strings.game.default_opponent_name;
+  opponentTeamIndex: number = 0; 
+  
+  gameDuration: number = 45; 
+  gameVisuals?: GameVisualConfig;
+
+  protected animationFrameId: number | null = null;
+  protected activeConnection?: FirebasePeerConnection;
+
+  public onReturnToMenu: () => void = () => {};
 
   isChannelOrdered(channel: RTCDataChannel) { return channel.ordered; }
   isChannelReliable(channel: RTCDataChannel) { return (channel.maxPacketLifeTime === null && channel.maxRetransmits === null); }
@@ -30,53 +46,50 @@ export abstract class GameWrapper {
   constructor(gameClass: GameClass) {
     this.gameClass = gameClass;
 
-    // Create canvas
     this.canvas = document.createElement("canvas");
-    // We will set dimensions in resize()
     this.canvas.style.backgroundColor = "transparent";
     this.canvas.style.position = "absolute";
     this.canvas.style.zIndex = "0";
-    
-    // --- CHANGE: Hide canvas initially so we see the menu background ---
     this.canvas.style.display = "none"; 
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
     document.body.appendChild(this.canvas);
 
-    // Create stats UI (HIDDEN)
     this.stats = document.createElement("div");
     this.stats.style.zIndex = "1";
     this.stats.style.position = "absolute";
     this.stats.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
     this.stats.style.color = "white";
     this.stats.style.padding = "5px";
-    this.stats.style.display = "none"; // FORCE HIDE
+    this.stats.style.display = "none"; 
     document.body.appendChild(this.stats);
 
-    // Create browser background info (Translated to Greek)
     this.playerPausedIndicator = (() => {
-      const div = document.createElement("div");
-      div.style.zIndex = "1";
-      div.style.position = "absolute";
-      div.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
-      div.style.color = "white";
-      div.style.padding = "15px";
-      div.style.borderRadius = "10px";
-      div.style.left = "50%";
-      div.style.top = "50%";
-      div.style.transform = "translate(-50%, -50%)";
-      div.style.boxSizing = "border-box";
-      div.style.fontFamily = "'Nunito', sans-serif";
-      div.style.textAlign = "center";
-      div.innerHTML = `
-      <h3 style="margin: 0 0 10px 0; color: #ff9f43;">${strings.game.opponent_away_title}</h3>
-      <p style="margin: 3px">${strings.game.opponent_away_desc}</p>
-      <p style="margin: 3px; font-size: 0.9em; opacity: 0.8;">${strings.game.opponent_away_note}</p>
+      const container = document.createElement("div");
+      container.className = "game-menu-overlay";
+      container.style.zIndex = "99999"; 
+      container.style.display = "none"; 
+
+      const card = document.createElement("div");
+      card.className = "menu-card";
+      
+      card.innerHTML = `
+        <div style="font-size: 3.5rem; margin-bottom: 20px;">⏸</div>
+        <h3 class="menu-subtitle" style="color: var(--primary-color); font-size: 1.5rem; margin-bottom: 1rem; margin-top:0;">
+            ${strings.game.opponent_away_title}
+        </h3>
+        <p style="margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: bold; color: var(--text-main);">
+            ${strings.game.opponent_away_desc}
+        </p>
+        <p style="margin: 0; font-size: 0.9em; color: var(--text-muted); font-style: italic;">
+            ${strings.game.opponent_away_note}
+        </p>
       `;
-      div.style.display = "none";
-      document.body.appendChild(div);
-      return div;
+
+      container.appendChild(card);
+      document.body.appendChild(container);
+      return container;
     })();
 
     if (this.gameClass.touchControls && window.navigator.userAgent.toLowerCase().includes("mobile")) {
@@ -95,70 +108,80 @@ export abstract class GameWrapper {
     );
   }
 
-  // Calculate Layout removed - we use full screen now
-
   resize() {
     const pixelRatio = (this.gameClass.highDPI && window.devicePixelRatio) ? window.devicePixelRatio : 1;
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    // Set internal resolution
     this.canvas.width = width * pixelRatio;
     this.canvas.height = height * pixelRatio;
 
-    // Set CSS to fill window
     this.canvas.style.width = "100%";
     this.canvas.style.height = "100%";
     this.canvas.style.left = "0px";
     this.canvas.style.top = "0px";
 
-    // Propagate resize to game
     const gameInstance = (this as any).game;
     if (gameInstance) {
         gameInstance.resize(this.canvas.width, this.canvas.height);
     }
   }
 
-  async start() {
-    const gameMenu = new GameMenu();
-
-    gameMenu.onClientStart.once((conn) => {
-      this.canvas.style.display = "block";
-      const players = [new NetplayPlayer(0, false, true), new NetplayPlayer(1, true, false)];
-      this.watchRTCStats(conn.peerConnection);
-      this.startPing(conn);
-      this.startVisibilityWatcher(conn);
-      this.startClient(players, conn);
-      // Trigger resize once game is created to ensure aspect ratio is correct
-      this.resize();
-    });
-
-    gameMenu.onHostStart.once((conn) => {
-      this.canvas.style.display = "block";
-      const players = [new NetplayPlayer(0, true, true), new NetplayPlayer(1, false, false)];
-      this.watchRTCStats(conn.peerConnection);
-      this.startPing(conn);
-      this.startVisibilityWatcher(conn);
-      this.startHost(players, conn);
-      // Trigger resize once game is created to ensure aspect ratio is correct
-      this.resize();
-    });
-  }
-
   startVisibilityWatcher(conn: FirebasePeerConnection) {
     conn.send({ type: "visibility-state", value: document.visibilityState });
+    
     document.addEventListener("visibilitychange", () => {
-      log.debug(`My visibility state changed to: ${document.visibilityState}.`);
       conn.send({ type: "visibility-state", value: document.visibilityState });
     });
+
     conn.on("data", (data) => {
       if (data.type === "visibility-state") {
         if (data.value === "hidden") {
-          this.playerPausedIndicator.style.display = "inherit";
+          this.playerPausedIndicator.style.display = "flex";
+          this.playerPausedIndicator.style.pointerEvents = "auto"; 
+          
+          const card = this.playerPausedIndicator.firstElementChild as HTMLElement;
+          if (card) {
+             card.animate([
+               { transform: 'scale(0.9)', opacity: 0 },
+               { transform: 'scale(1)', opacity: 1 }
+             ], { duration: 300, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' });
+          }
+
         } else {
           this.playerPausedIndicator.style.display = "none";
+          this.playerPausedIndicator.style.pointerEvents = "none";
         }
       }
+    });
+
+    conn.onClose.on(() => {
+        const card = this.playerPausedIndicator.firstElementChild as HTMLElement;
+        if (card) {
+            card.innerHTML = `
+              <div style="font-size: 3.5rem; margin-bottom: 20px;">🔌</div>
+              <h3 class="menu-subtitle" style="color: var(--danger-color); font-size: 1.5rem; margin-bottom: 1rem; margin-top: 0;">
+                ${strings.game.conn_lost_title}
+              </h3>
+              <p style="margin: 0 0 2rem 0; font-size: 1.1rem; font-weight: bold; color: var(--text-main);">
+                ${strings.game.conn_lost_desc}
+              </p>
+              
+              <button id="btn-return-menu" class="btn btn-primary" style="margin-bottom: 0;">
+                ${strings.game.btn_return}
+              </button>
+            `;
+            
+            const btn = card.querySelector("#btn-return-menu");
+            if (btn) {
+                btn.addEventListener("click", () => {
+                    this.destroy(); 
+                    this.onReturnToMenu(); 
+                });
+            }
+        }
+        this.playerPausedIndicator.style.display = "flex";
+        this.playerPausedIndicator.style.pointerEvents = "auto";
     });
   }
 
@@ -199,7 +222,68 @@ export abstract class GameWrapper {
     setTimeout(async () => { await this.watchRTCStats(connection); }, 1000);
   }
 
-  abstract startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection);
-  abstract startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection);
+  private getTeamFromIndex(index: number) {
+      if (typeof index !== 'number') return null;
+      if (index <= 0) return null; 
+      
+      const realIndex = index - 1;
+      if (realIndex >= 0 && realIndex < sortedTeamsList.length) {
+          return sortedTeamsList[realIndex];
+      }
+      return null;
+  }
+
+  public pushProfilesToGame(game: Game | undefined, isHost: boolean) {
+      if (!game) return;
+
+      const localTeam = this.getTeamFromIndex(this.localTeamIndex);
+      const oppTeam = this.getTeamFromIndex(this.opponentTeamIndex);
+
+      const g = game as any;
+      if (typeof g.setPlayerProfiles === 'function') {
+           if (isHost) {
+              g.setPlayerProfiles(
+                  { name: this.localPlayerName, team: localTeam }, 
+                  { name: this.opponentName, team: oppTeam }
+              );
+          } else {
+              g.setPlayerProfiles(
+                  { name: this.opponentName, team: oppTeam },
+                  { name: this.localPlayerName, team: localTeam }
+              );
+          }
+      }
+
+      if (this.gameVisuals && typeof g.setVisualConfig === 'function') {
+          g.setVisualConfig(this.gameVisuals);
+      }
+  }
+
+  protected handleProfileData(data: any, game: Game | undefined, isHost: boolean) {
+  }
+
+  destroy() {
+      if (this.animationFrameId !== null) {
+          cancelAnimationFrame(this.animationFrameId);
+          this.animationFrameId = null;
+      }
+      if (this.activeConnection) {
+          this.activeConnection.close();
+          this.activeConnection = undefined;
+      }
+      if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
+      if (this.stats.parentNode) this.stats.parentNode.removeChild(this.stats);
+      if (this.playerPausedIndicator.parentNode) this.playerPausedIndicator.parentNode.removeChild(this.playerPausedIndicator);
+
+      this.inputReader.destroy();
+
+      const gameInstance = (this as any).game;
+      if (gameInstance && typeof gameInstance.destroy === 'function') {
+          gameInstance.destroy();
+      }
+  }
+
+  abstract startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string, visuals?: GameVisualConfig);
+  abstract startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string, visuals?: GameVisualConfig);
 }
 

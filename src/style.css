@@ -35,6 +35,19 @@ html, body {
   font-family: var(--font-stack);
   color: var(--text-main);
   user-select: none;
+  /* PREVENT SCROLL/BOUNCE ON MOBILE */
+  overscroll-behavior: none;
+}
+
+/* CRITICAL FIX FOR MOBILE INPUTS */
+canvas {
+    touch-action: none; /* Prevents browser scrolling/zooming */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none;
+    /* Ensure canvas sits above other elements but below UI overlay */
+    z-index: 0; 
 }
 
 /* --- Menu Overlay --- */
@@ -66,17 +79,19 @@ html, body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding-bottom: 2rem;
+    max-height: 90vh; /* Prevent overflow on small screens */
+    overflow-y: auto; /* Allow scrolling inside card if needed */
 }
 
 .menu-title {
   margin-top: 0;
-  margin-bottom: 2rem;
-  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 2.0rem;
   font-weight: 900;
   color: #0984e3;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  text-shadow: 2px 2px 0px #74b9ff;
+  letter-spacing: 1px;
 }
 
 .menu-logo {
@@ -84,7 +99,7 @@ html, body {
     height: auto;
     display: block;
     object-fit: contain;
-    margin: 3rem 0 2rem;
+    margin: 2rem 0 0.5rem;
 }
 
 .menu-subtitle {
@@ -102,6 +117,173 @@ html, body {
   border-radius: 2px;
   width: calc(100% - 2 * 3rem);
 }
+
+/* --- Player & Team Info Display --- */
+.profile-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.info-badge {
+    background: #f1f2f6;
+    border: 2px solid #dfe6e9;
+    border-radius: 20px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: 800;
+    color: var(--text-main);
+    font-size: 1.1rem;
+    width: calc(100% - 4rem); /* Match button width logic roughly */
+    max-width: 300px;
+}
+
+.team-badge-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.team-badge-icon {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid #dfe6e9;
+}
+
+.team-badge-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.btn-mini-change {
+    background: var(--secondary-color);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s;
+    flex-shrink: 0;
+}
+
+.btn-mini-change:active {
+    transform: scale(0.9);
+}
+
+/* --- Team Selection Grid --- */
+.team-selection-container {
+    width: 100%;
+    padding: 0 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.team-grid {
+    display: grid;
+    /* Use minmax(0, 1fr) to force equal widths and prevent content blowout */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    border: 2px solid #dfe6e9;
+    margin-bottom: 1.5rem;
+    box-sizing: border-box; /* Ensures padding/border doesn't overflow width */
+}
+
+/* Custom Scrollbar for Team Grid */
+.team-grid::-webkit-scrollbar {
+    width: 8px;
+}
+.team-grid::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+    border-radius: 4px;
+}
+.team-grid::-webkit-scrollbar-thumb {
+    background: #b2bec3; 
+    border-radius: 4px;
+}
+.team-grid::-webkit-scrollbar-thumb:hover {
+    background: #636e72; 
+}
+
+.team-card {
+    background: white;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.team-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+}
+
+.team-card.selected {
+    border-color: var(--primary-color);
+    background-color: #fff3e0;
+    box-shadow: 0 0 0 2px rgba(255, 159, 67, 0.3);
+}
+
+.team-card-icon {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    margin-bottom: 5px;
+}
+
+.team-card-name {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.1;
+    color: var(--text-muted);
+    
+    /* Ensure long words break onto the next line */
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+/* Responsive adjustment for smaller mobile screens */
+@media (max-width: 400px) {
+    .team-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.team-card.selected .team-card-name {
+    color: var(--primary-color);
+}
+
 
 /* --- Bouncy Buttons --- */
 .btn {
@@ -164,7 +346,7 @@ html, body {
     align-items: center;
     margin-top: 10px;
     flex-wrap: wrap;
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
     padding: 0 10px;
 }
 
@@ -184,7 +366,23 @@ html, body {
   transition: all 0.2s;
 }
 
-.code-input:focus {
+.name-input {
+    background-color: #f1f2f6;
+    border: 3px solid #dfe6e9;
+    color: var(--text-main);
+    border-radius: var(--input-radius);
+    padding: 12px;
+    font-size: 1.2rem;
+    text-align: center;
+    width: 250px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    outline: none;
+    transition: all 0.2s;
+    margin-bottom: 2rem;
+}
+
+.name-input:focus, .code-input:focus {
   border-color: var(--secondary-color);
   background-color: #fff;
 }
@@ -248,7 +446,7 @@ html, body {
     width: 100vw;
     height: 100vh;
     background: linear-gradient(135deg, #1e272e 0%, #485460 100%);
-    z-index: 10000; /* Must cover everything */
+    z-index: 10000;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -308,3 +506,251 @@ html, body {
     transition: width 0.1s linear;
 }
 
+
+
+/* --- Game Over UI --- */
+.game-over-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.5s ease-out;
+    padding: 20px; /* Prevents card from touching edges on small screens */
+    box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.game-over-card {
+    background: white;
+    border-radius: 30px;
+    padding: 40px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+}
+
+.game-over-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 3rem;
+    margin: 0;
+    background: linear-gradient(135deg, #FF9F43 0%, #ff6b6b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.result-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.player-result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    border-radius: 20px;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Changed from fixed width to flexible width for mobile */
+    flex: 1;
+    min-width: 0; /* Allows text truncation to work in flex children */
+    max-width: 140px;
+}
+
+.player-result.winner {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 4px solid #fdcb6e;
+    transform: scale(1.1);
+    box-shadow: 0 10px 20px rgba(253, 203, 110, 0.3);
+    z-index: 2;
+}
+
+.player-result.loser {
+    background: #f1f2f6;
+    opacity: 0.8;
+    transform: scale(0.9);
+    filter: grayscale(0.5);
+}
+
+.result-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid rgba(0,0,0,0.1);
+    object-fit: contain;
+}
+
+.player-result.winner .result-avatar {
+    border-color: #fdcb6e;
+}
+
+.result-name {
+    font-weight: 800;
+    color: #2d3436;
+    font-size: 1.1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%; /* Ensure truncation works */
+}
+
+.result-badge {
+    font-size: 0.8rem;
+    font-weight: 900;
+    padding: 4px 12px;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.winner .result-badge {
+    background: #fdcb6e;
+    color: #d35400;
+}
+
+.loser .result-badge {
+    background: #dfe6e9;
+    color: #636e72;
+}
+
+.vs-divider {
+    font-weight: 900;
+    color: #b2bec3;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.btn-home {
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 50px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 6px 0 var(--secondary-shadow);
+    transition: all 0.1s;
+    text-transform: uppercase;
+    width: 100%;
+    -webkit-tap-highlight-color: transparent; /* Fix mobile touch highlight */
+}
+
+.btn-home:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 var(--secondary-shadow);
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 480px) {
+    .game-over-card {
+        padding: 25px 20px;
+        border-radius: 20px;
+        gap: 15px;
+    }
+
+    .game-over-title {
+        font-size: 2rem;
+    }
+
+    .result-container {
+        gap: 8px;
+        margin: 10px 0;
+    }
+
+    .player-result {
+        padding: 10px 5px;
+        gap: 5px;
+    }
+
+    /* Reduce the scale effect on mobile so it doesn't overflow */
+    .player-result.winner {
+        transform: scale(1.05);
+    }
+    .player-result.loser {
+        transform: scale(0.95);
+    }
+
+    .result-avatar {
+        width: 50px;
+        height: 50px;
+        border-width: 2px;
+    }
+
+    .result-name {
+        font-size: 0.9rem;
+    }
+
+    .result-badge {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+    }
+
+    .vs-divider {
+        font-size: 1rem;
+    }
+
+    .btn-home {
+        padding: 12px;
+        font-size: 1rem;
+    }
+}
+
+/* --- Time Picker Animation --- */
+.anim-pop {
+    animation: textPop 0.2s ease-out;
+}
+
+@keyframes textPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* --- Picker Buttons --- */
+.picker-btn {
+    /* Fix for blue highlight on Android/Chrome */
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    /* Ensure no text selection interferes */
+    user-select: none;
+}
+
+/* Only scale up on hover if the device actually supports hovering (Desktop) */
+/* This prevents the button from getting stuck "big" on mobile after a tap */
+@media (hover: hover) {
+    .picker-btn:hover:not([disabled]) {
+        transform: scale(1.2);
+    }
+}
+
+/* Active state (press) scales down for tactile feel on all devices */
+.picker-btn:active:not([disabled]) {
+    transform: scale(0.9);
+}

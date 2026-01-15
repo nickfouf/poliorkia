@@ -4,7 +4,8 @@
  */
 export class IdGenerator {
     // Range size: 999999 - 111111 + 1 = 888889
-    private static readonly MODULUS = 888889;
+    // --- CHANGED: Made public for reuse logic ---
+    public static readonly MODULUS = 888889;
     private static readonly OFFSET = 111111;
     // A large prime number roughly 2/3rds of the modulus to scatter values
     // Must be coprime to MODULUS.
@@ -26,4 +27,3 @@ export class IdGenerator {
         return id.toString();
     }
 }
-

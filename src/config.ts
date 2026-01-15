@@ -47,13 +47,15 @@ export const PHYSICS = {
 export const VISUALS = {
     BAND_THICKNESS: 0.04,
     BAND_HEIGHT_SCALE: 4.0,
-    BAND_COLOR: 0xdeb887,
+    BAND_COLOR: 0xff7800,
     BAND_SEGMENTS: 200,
     CANVAS_WIDTH: 600,
     CANVAS_HEIGHT: 900,
 };
 
-// --- NEW CONFIGURATION ---
+export const GAME_CONFIG = {
+    DURATION_SECONDS: 45
+};
 
 export const TIMING_CONFIG = {
     NORMAL: {
@@ -61,14 +63,20 @@ export const TIMING_CONFIG = {
         FADE: 1500,
         POST_FADE_WAIT: 1000,
         CAMERA_MOVE: 3500,
-        COUNTDOWN: 6000,
+        // 3000ms / 3 steps = 1 second per number
+        COUNTDOWN: 3000, 
+        // 1 second for "Go!"
+        GO_SIGNAL: 1000, 
     },
     FAST: {
         INITIAL_BLACK: 200,
         FADE: 500,
         POST_FADE_WAIT: 200,
         CAMERA_MOVE: 1500,
+        // CHANGED: Match NORMAL speed (1s per number) even in fast mode
         COUNTDOWN: 3000,
+        // CHANGED: Match NORMAL speed (1s for Go)
+        GO_SIGNAL: 1000,
     }
 };
 
@@ -78,3 +86,34 @@ export const GAME_FLOW = {
     COUNTDOWN_MS: TIMING_CONFIG.NORMAL.COUNTDOWN,
 };
 
+// --- NEW: Color Palettes for UI ---
+export const PALETTES = {
+    DISCS: [
+        { name: "ΜΠΛΕ", value: "#1F3C6E" },
+        { name: "ΚΟΚΚΙΝΟ", value: "#8C1D18" },
+        { name: "ΚΙΤΡΙΝΟ", value: "#f1c40f" },
+        { name: "ΠΡΑΣΙΝΟ", value: "#27ae60" },
+        { name: "ΠΟΡΤΟΚΑΛΙ", value: "#d35400" },
+        { name: "ΜΩΒ", value: "#8e44ad" },
+        { name: "ΜΑΥΡΟ", value: "#2d3436" },
+        { name: "ΛΕΥΚΟ", value: "#dfe6e9" },
+        { name: "ΚΥΑΝΟ", value: "#00cec9" },
+        { name: "ΡΟΖ", value: "#fd79a8" }
+    ],
+    WOOD: [
+        { name: "ΚΛΑΣΙΚΟ", value: "#4A2E1F" },
+        { name: "ΠΡΑΣΙΝΟ", value: "#145A32" },
+        { name: "ΚΟΚΚΙΝΩΠΟ", value: "#641E16" },
+        { name: "ΜΑΥΡΟ", value: "#1e272e" },
+        { name: "ΑΝΟΙΧΤΟ", value: "#A67B5B" }
+    ],
+    FLOOR: [
+        { name: "ΛΕΥΚΟ", value: "#FFFFFF" },
+        { name: "ΠΡΑΣΙΝΟ", value: "#145A32" },
+        { name: "ΓΚΡΙ", value: "#7e7e7e" },
+        { name: "ΣΚΟΥΡΟ", value: "#2d3436" },
+        { name: "ΚΙΤΡΙΝΟ", value: "#ffde2e" },
+        { name: "ΜΠΛΕ", value: "#1F3C6E" },
+        { name: "ΚΟΚΚΙΝΟ", value: "#8C1D18" },
+    ]
+};

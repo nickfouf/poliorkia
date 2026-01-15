@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
+// ADDED: Import Auth
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAPvMietdRlqWwCu94qOoPWY-E20G9ljnk",
@@ -14,6 +16,8 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
+// ADDED: Export Auth
+export const auth = getAuth(app);
 
 // Uncomment if you use a local emulator during dev
 // connectDatabaseEmulator(db, 'localhost', 9000);

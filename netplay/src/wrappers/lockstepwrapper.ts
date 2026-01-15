@@ -4,6 +4,7 @@ import { NetplayPlayer } from "../netcode/types";
 import * as log from "loglevel";
 import { GameWrapper } from "./gamewrapper";
 import { Game, GameClass } from "../game";
+// REMOVED CIRCULAR IMPORT: import { PasseTrappeGame } from "../../../../src/game";
 import { assert } from "chai";
 import { FirebasePeerConnection } from "../matchmaking/firebase-client";
 
@@ -14,10 +15,22 @@ export class LockstepWrapper extends GameWrapper {
   constructor(gameClass: GameClass) { super(gameClass); }
   getStateSyncPeriod(): number { return this.gameClass.deterministic ? 0 : 1; }
 
-  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
+  destroy() {
+    if (this.lockstepNetcode) {
+        this.lockstepNetcode.stop();
+        this.lockstepNetcode = undefined;
+    }
+    super.destroy();
+  }
+
+  startHost(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string) {
     assert(conn.dataChannel?.readyState === "open", "DataChannel must be open.");
     log.info("Starting a lockstep host.");
     this.game = new this.gameClass(this.canvas, players);
+    
+    // Dynamic access
+    this.pushProfilesToGame(this.game, true);
+
     this.lockstepNetcode = new LockstepNetcode(
       true, this.game!, players, this.gameClass.timestep, this.getStateSyncPeriod(),
       () => this.inputReader.getInput(),
@@ -25,6 +38,8 @@ export class LockstepWrapper extends GameWrapper {
       (frame, state) => { conn.send({ type: "state", frame: frame, state: state }); }
     );
     conn.on("data", (data) => {
+      this.handleProfileData(data, this.game, true);
+
       if (data.type === "input") {
         let input = new DefaultInput();
         input.deserialize(data.input);
@@ -35,16 +50,22 @@ export class LockstepWrapper extends GameWrapper {
     this.startGameLoop(conn);
   }
 
-  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection) {
+  startClient(players: Array<NetplayPlayer>, conn: FirebasePeerConnection, opponentName: string) {
     assert(conn.dataChannel?.readyState === "open", "DataChannel must be open.");
     log.info("Starting a lockstep client.");
     this.game = new this.gameClass(this.canvas, players);
+    
+    // Dynamic access
+    this.pushProfilesToGame(this.game, false);
+
     this.lockstepNetcode = new LockstepNetcode(
       false, this.game!, players, this.gameClass.timestep, this.getStateSyncPeriod(),
       () => this.inputReader.getInput(),
       (frame, input) => { conn.send({ type: "input", frame: frame, input: input.serialize() }); }
     );
     conn.on("data", (data) => {
+      this.handleProfileData(data, this.game, false);
+
       if (data.type === "input") {
         let input = new DefaultInput();
         input.deserialize(data.input);
@@ -58,13 +79,11 @@ export class LockstepWrapper extends GameWrapper {
   }
 
   startGameLoop(conn: FirebasePeerConnection) {
-    // --- FORCE HIDE STATS ---
     this.stats.style.display = "none";
 
     this.lockstepNetcode!.start();
     let animate = (timestamp) => {
       this.game!.draw(this.canvas);
-      // Stats exist in DOM but are hidden
       this.stats.innerHTML = `
       <div>Algorithm: Lockstep</div>
       <div>Ping: ${this.pingMeasure.average().toFixed(2)} ms</div>
@@ -74,6 +93,4 @@ export class LockstepWrapper extends GameWrapper {
     requestAnimationFrame(animate);
   }
 }
-
-
 
